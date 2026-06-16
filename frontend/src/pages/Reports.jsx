@@ -254,9 +254,9 @@ export default function Reports() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               whileHover={{ y: -5 }}
-              className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all flex flex-col"
+              className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all flex flex-col"
             >
-              <div className={`bg-gradient-to-br ${report.color} h-28 flex items-center justify-center text-white`}>
+              <div className={`bg-gradient-to-br ${report.color} h-28 flex items-center justify-center text-white rounded-t-xl`}>
                 <Icon size={40} opacity={0.8} />
               </div>
 

@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const colors = require('tailwindcss/colors');
+
 export default {
   content: [
     "./index.html",
@@ -8,8 +10,14 @@ export default {
     extend: {
       colors: {
         navy: '#001f3f',
-        cyan: '#0EA5E9',
-        purple: '#A855F7',
+        cyan: {
+          DEFAULT: '#0EA5E9',
+          ...colors.cyan
+        },
+        purple: {
+          DEFAULT: '#A855F7',
+          ...colors.purple
+        },
       },
       backgroundColor: {
         gradient: 'linear-gradient(135deg, #001f3f 0%, #0EA5E9 100%)',

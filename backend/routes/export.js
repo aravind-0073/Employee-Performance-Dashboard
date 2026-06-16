@@ -41,7 +41,7 @@ function styleHeaderRow(worksheet) {
 // Export detained students as Excel
 router.get('/detained-excel', async (req, res) => {
   try {
-    const query = buildQuery(req.query);
+    const query = buildQuery(req);
     query.isDetained = true;
     const detainedStudents = await Student.find(query).sort({ attendancePercentage: 1 });
 
@@ -80,7 +80,7 @@ router.get('/detained-excel', async (req, res) => {
 // Export detained students as PDF
 router.get('/detained-pdf', async (req, res) => {
   try {
-    const query = buildQuery(req.query);
+    const query = buildQuery(req);
     query.isDetained = true;
     const students = await Student.find(query).sort({ attendancePercentage: 1 });
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -182,7 +182,7 @@ router.get('/detained-pdf', async (req, res) => {
 // All students Excel
 router.get('/all-students-excel', async (req, res) => {
   try {
-    const query = buildQuery(req.query);
+    const query = buildQuery(req);
     const students = await Student.find(query).sort({ usn: 1 });
 
     const workbook = new ExcelJS.Workbook();
@@ -235,7 +235,7 @@ router.get('/all-students-excel', async (req, res) => {
 // All students PDF
 router.get('/all-students-pdf', async (req, res) => {
   try {
-    const query = buildQuery(req.query);
+    const query = buildQuery(req);
     const students = await Student.find(query).sort({ usn: 1 });
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -298,7 +298,7 @@ router.get('/all-students-pdf', async (req, res) => {
 // Department report Excel
 router.get('/department-report-excel', async (req, res) => {
   try {
-    const students = await fetchStudents(buildQuery(req.query));
+    const students = await fetchStudents(buildQuery(req));
     let ranking = [];
     try {
       const result = await withErrorHandling(insightsAPI.departmentRanking(students));
@@ -350,7 +350,7 @@ router.get('/department-report-excel', async (req, res) => {
 // Department report PDF
 router.get('/department-report-pdf', async (req, res) => {
   try {
-    const students = await fetchStudents(buildQuery(req.query));
+    const students = await fetchStudents(buildQuery(req));
     let ranking = [];
     try {
       const result = await withErrorHandling(insightsAPI.departmentRanking(students));
@@ -401,7 +401,7 @@ router.get('/department-report-pdf', async (req, res) => {
 // Top performers Excel
 router.get('/top-performers-excel', async (req, res) => {
   try {
-    const query = buildQuery(req.query);
+    const query = buildQuery(req);
     const limit = parseInt(req.query.limit) || 10;
     const students = await Student.find(query).sort({ gpa: -1 }).limit(limit);
 
@@ -441,7 +441,7 @@ router.get('/top-performers-excel', async (req, res) => {
 // Risk report Excel
 router.get('/risk-report-excel', async (req, res) => {
   try {
-    const students = await fetchStudents(buildQuery(req.query));
+    const students = await fetchStudents(buildQuery(req));
     let riskData = [];
     try {
       const result = await withErrorHandling(insightsAPI.riskScores(students));
@@ -486,7 +486,7 @@ router.get('/risk-report-excel', async (req, res) => {
 // Risk report PDF
 router.get('/risk-report-pdf', async (req, res) => {
   try {
-    const students = await fetchStudents(buildQuery(req.query));
+    const students = await fetchStudents(buildQuery(req));
     let riskData = [];
     try {
       const result = await withErrorHandling(insightsAPI.riskScores(students));
@@ -539,8 +539,8 @@ router.get('/risk-report-pdf', async (req, res) => {
 // Executive Summary PDF
 router.get('/executive-summary-pdf', async (req, res) => {
   try {
-    const allStudents = await Student.find(buildQuery(req.query)).lean();
-    const students = await fetchStudents(buildQuery(req.query));
+    const allStudents = await Student.find(buildQuery(req)).lean();
+    const students = await fetchStudents(buildQuery(req));
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     const total = allStudents.length;
 

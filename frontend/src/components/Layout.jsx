@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Menu, X, BarChart3, Users, BookOpen, AlertTriangle, Upload, FileText, Home } from 'lucide-react';
+import { Menu, X, BarChart3, Users, BookOpen, AlertTriangle, Upload, FileText, Home, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const location = useLocation();
+  const { user, logout } = useAuth();
 
   const menuItems = [
     { path: '/', icon: Home, label: 'Dashboard' },
@@ -27,7 +29,7 @@ export default function Layout() {
         transition={{ duration: 0.3 }}
         className={`${
           sidebarOpen ? 'w-64' : 'w-20'
-        } bg-gradient-to-b from-navy to-slate-900 text-white transition-all duration-300 shadow-lg overflow-y-auto`}
+        } bg-gradient-to-b from-navy to-slate-900 text-white transition-all duration-300 shadow-lg overflow-y-auto flex flex-col`}
       >
         <div className="p-6 flex items-center justify-between">
           {sidebarOpen && <h1 className="text-xl font-bold">StudentHub</h1>}
@@ -39,7 +41,7 @@ export default function Layout() {
           </button>
         </div>
 
-        <nav className="mt-8 px-3">
+        <nav className="mt-8 px-3 flex-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -59,6 +61,41 @@ export default function Layout() {
             );
           })}
         </nav>
+
+        {/* User info + Logout at bottom */}
+        {sidebarOpen && user && (
+          <div className="p-4 border-t border-slate-700/50">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold"
+                style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}>
+                {user.name?.charAt(0)?.toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{user.name}</p>
+                <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
+            >
+              <LogOut size={14} />
+              Sign Out
+            </button>
+          </div>
+        )}
+
+        {!sidebarOpen && user && (
+          <div className="p-3 border-t border-slate-700/50 flex flex-col items-center gap-2">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold"
+              style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}>
+              {user.name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <button onClick={logout} className="text-slate-400 hover:text-white transition-colors">
+              <LogOut size={16} />
+            </button>
+          </div>
+        )}
       </motion.aside>
 
       {/* Main Content */}
@@ -69,6 +106,11 @@ export default function Layout() {
             <h2 className="text-2xl font-bold text-navy">
               Student Performance Analysis Dashboard
             </h2>
+            {user && (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500">Welcome, <span className="font-semibold text-navy">{user.name}</span></span>
+              </div>
+            )}
           </div>
         </header>
 
