@@ -1,274 +1,344 @@
-import { useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { toast } from 'react-toastify';
-import { Upload, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  UploadCloud,
+  FileSpreadsheet,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  Download,
+  RefreshCw,
+  Info,
+  ShieldCheck,
+  Check,
+  X
+} from 'lucide-react';
 import { uploadAPI } from '../services/api';
 
 export default function UploadDataset() {
   const [file, setFile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [uploadResult, setUploadResult] = useState(null);
-  const [clearExisting, setClearExisting] = useState(false);
-  const fileInputRef = useRef(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [mode, setMode] = useState('append'); // 'append' or 'overwrite'
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleFileSelect = (e) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      const allowedTypes = [
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-excel',
-        'text/csv'
-      ];
-
-      if (!allowedTypes.includes(selectedFile.type)) {
-        toast.error('Please upload an Excel (.xlsx) or CSV file');
-        return;
-      }
-
-      if (selectedFile.size > 50 * 1024 * 1024) {
-        toast.error('File size should be less than 50MB');
-        return;
-      }
-
-      setFile(selectedFile);
-      setUploadResult(null);
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) {
-      toast.error('Please select a file');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await uploadAPI.uploadFile(file, clearExisting);
-      setUploadResult(response.data.data);
-      setFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      toast.success(response.data.message);
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Upload failed');
-      console.error(error);
-    } finally {
-      setLoading(false);
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      validateAndSetFile(e.dataTransfer.files[0]);
     }
   };
 
-  const handleClearData = async () => {
-    if (!window.confirm('Are you sure you want to delete all student data? This action cannot be undone.')) {
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      validateAndSetFile(e.target.files[0]);
+    }
+  };
+
+  const validateAndSetFile = (selectedFile) => {
+    setErrorMessage('');
+    setResult(null);
+    const validExts = ['.xlsx', '.xls', '.csv'];
+    const name = selectedFile.name.toLowerCase();
+    const isMatch = validExts.some((ext) => name.endsWith(ext));
+
+    if (!isMatch) {
+      setErrorMessage('Invalid file format. Please upload an .xlsx, .xls, or .csv file.');
       return;
     }
 
+    setFile(selectedFile);
+  };
+
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!file) return;
+
     try {
-      setLoading(true);
-      await uploadAPI.deleteAll();
-      setUploadResult(null);
-      toast.success('All data deleted successfully');
-    } catch (error) {
-      toast.error('Failed to delete data');
-      console.error(error);
+      setUploading(true);
+      setErrorMessage('');
+      setResult(null);
+
+      const res = await uploadAPI.uploadFile(file, mode);
+      if (res.data?.success) {
+        setResult(res.data);
+        setFile(null);
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+      setErrorMessage(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Upload failed. Please verify that your file contains all required headers.'
+      );
     } finally {
-      setLoading(false);
+      setUploading(false);
+    }
+  };
+
+  const downloadTemplate = async (type) => {
+    try {
+      const res =
+        type === 'excel'
+          ? await uploadAPI.downloadExcelTemplate()
+          : await uploadAPI.downloadCsvTemplate();
+
+      const ext = type === 'excel' ? 'xlsx' : 'csv';
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `employee_template.${ext}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert('Failed to download template');
     }
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Upload Area */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-lg shadow-lg p-8"
-      >
-        <h2 className="text-2xl font-bold text-navy mb-6">Upload Student Data</h2>
-
-        {/* File Drop Zone */}
-        <div
-          onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-cyan rounded-lg p-12 text-center cursor-pointer hover:bg-cyan/5 transition-colors"
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-
-          <motion.div
-            whileHover={{ scale: 1.1 }}
-            className="mb-4"
-          >
-            <Upload size={48} className="mx-auto text-cyan" />
-          </motion.div>
-
-          <h3 className="text-lg font-semibold text-navy mb-2">
-            {file ? file.name : 'Drop your file here or click to browse'}
-          </h3>
-          <p className="text-gray-600 text-sm">
-            Supported formats: Excel (.xlsx), CSV
-            <br />
-            Maximum file size: 50MB
+    <div className="space-y-6">
+      {/* ─── Page Header ──────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <UploadCloud className="w-5 h-5 text-indigo-600" />
+            <span>Employee Data Ingestion & Dataset Management</span>
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Bulk ingest organizational records via Excel or CSV with real-time schema validation
           </p>
         </div>
 
-        {/* File Info */}
-        {file && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200"
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => downloadTemplate('excel')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60 transition-colors cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-navy">{file.name}</p>
-                <p className="text-sm text-gray-600">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setFile(null);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                  }
-                }}
-                className="text-red-600 hover:text-red-700"
-              >
-                <Trash2 size={20} />
-              </button>
-            </div>
-          </motion.div>
-        )}
+            <Download size={14} />
+            <span>Excel Template</span>
+          </button>
+          <button
+            onClick={() => downloadTemplate('csv')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+          >
+            <Download size={14} />
+            <span>CSV Template</span>
+          </button>
+        </div>
+      </div>
 
-        {/* Options */}
-        <div className="mt-6 space-y-4">
-          <label className="flex items-center gap-3 cursor-pointer">
+      {/* ─── Ingestion Mode Selector ──────────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-indigo-600" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+            Ingestion Mode & Data Strategy
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label
+            onClick={() => setMode('append')}
+            className={`p-4 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+              mode === 'append'
+                ? 'bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-500 ring-2 ring-indigo-500/20'
+                : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+            }`}
+          >
             <input
-              type="checkbox"
-              checked={clearExisting}
-              onChange={(e) => setClearExisting(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300"
+              type="radio"
+              name="mode"
+              checked={mode === 'append'}
+              onChange={() => setMode('append')}
+              className="mt-0.5 accent-indigo-600"
             />
-            <span className="text-gray-700">
-              Clear existing data before uploading new data
-            </span>
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                Append & Update (Recommended)
+              </span>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Inserts newly detected employees and seamlessly updates existing matching employee IDs while preserving existing history.
+              </p>
+            </div>
+          </label>
+
+          <label
+            onClick={() => setMode('overwrite')}
+            className={`p-4 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+              mode === 'overwrite'
+                ? 'bg-rose-50/50 dark:bg-rose-950/30 border-rose-500 ring-2 ring-rose-500/20'
+                : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+            }`}
+          >
+            <input
+              type="radio"
+              name="mode"
+              checked={mode === 'overwrite'}
+              onChange={() => setMode('overwrite')}
+              className="mt-0.5 accent-rose-600"
+            />
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                Overwrite Full Organization Dataset
+              </span>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Clears all previous employee records for your workspace and replaces them completely with the uploaded spreadsheet.
+              </p>
+            </div>
           </label>
         </div>
+      </div>
 
-        {/* Action Buttons */}
-        <div className="mt-8 flex gap-4">
+      {/* ─── Drag & Drop Upload Zone ──────────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+        <div
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+          className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${
+            dragActive
+              ? 'border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 scale-[0.99]'
+              : 'border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 hover:border-slate-400'
+          }`}
+        >
+          <div className="max-w-md mx-auto space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 mx-auto flex items-center justify-center">
+              <UploadCloud size={24} />
+            </div>
+
+            <div>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                Drag and drop your spreadsheet here, or{' '}
+                <label className="text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
+                  browse files
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Supports Microsoft Excel (.xlsx, .xls) and CSV up to 20MB
+              </p>
+            </div>
+
+            {file && (
+              <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-indigo-200 dark:border-indigo-800 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 truncate">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{file.name}</span>
+                  <span className="text-slate-400">({(file.size / 1024).toFixed(1)} KB)</span>
+                </div>
+                <button
+                  onClick={() => setFile(null)}
+                  className="p-1 text-slate-400 hover:text-rose-500"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Error Alert */}
+        {errorMessage && (
+          <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-600 dark:text-rose-400 flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold">Schema Validation Error</p>
+              <p className="leading-relaxed">{errorMessage}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Success Alert */}
+        {result && (
+          <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-xs text-emerald-700 dark:text-emerald-300 space-y-2">
+            <div className="flex items-center gap-2 font-bold">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+              <span>{result.message}</span>
+            </div>
+            {result.summary && (
+              <div className="flex flex-wrap gap-4 pt-1 text-[11px] text-emerald-800 dark:text-emerald-200">
+                <span>Total Processed: <strong>{result.summary.validProcessed}</strong></span>
+                <span>Inserted: <strong>{result.summary.insertedCount}</strong></span>
+                <span>Updated: <strong>{result.summary.updatedCount}</strong></span>
+                {result.summary.errorCount > 0 && (
+                  <span className="text-amber-600">Skipped/Errors: <strong>{result.summary.errorCount}</strong></span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action Button */}
+        <div className="flex items-center justify-end">
           <button
             onClick={handleUpload}
-            disabled={!file || loading}
-            className="flex-1 px-6 py-3 bg-cyan text-white rounded-lg hover:bg-cyan/90 disabled:opacity-50 transition-colors font-semibold"
+            disabled={!file || uploading}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-md disabled:opacity-40 transition-all cursor-pointer"
           >
-            {loading ? 'Uploading...' : 'Upload File'}
-          </button>
-          <button
-            onClick={handleClearData}
-            disabled={loading}
-            className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors font-semibold"
-          >
-            Clear All Data
+            <RefreshCw className={`w-4 h-4 ${uploading ? 'animate-spin' : ''}`} />
+            <span>{uploading ? 'Validating & Processing...' : 'Upload & Process Dataset'}</span>
           </button>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Upload Result */}
-      {uploadResult && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white rounded-lg shadow-lg p-8"
-        >
-          <div className="flex items-start gap-4 mb-6">
-            <CheckCircle size={32} className="text-green-500 flex-shrink-0 mt-1" />
-            <div>
-              <h3 className="text-xl font-bold text-navy">Upload Successful!</h3>
-              <p className="text-gray-600 mt-1">Your student data has been processed and stored.</p>
-            </div>
-          </div>
+      {/* ─── Schema Reference Card ────────────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+        <div className="flex items-center gap-2">
+          <Info className="w-4 h-4 text-slate-500" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+            Required & Optional Dataset Headers Specification
+          </h3>
+        </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <p className="text-sm text-gray-600">Total Rows</p>
-              <p className="text-2xl font-bold text-green-600">{uploadResult.totalRows}</p>
-            </div>
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-gray-600">Inserted</p>
-              <p className="text-2xl font-bold text-blue-600">{uploadResult.insertedCount}</p>
-            </div>
-            <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-              <p className="text-sm text-gray-600">Failed</p>
-              <p className="text-2xl font-bold text-red-600">{uploadResult.failedCount}</p>
-            </div>
-          </div>
-
-          {uploadResult.errors && uploadResult.errors.length > 0 && (
-            <div className="mt-6">
-              <h4 className="font-semibold text-navy mb-3 flex items-center gap-2">
-                <AlertCircle size={20} className="text-red-500" />
-                Errors ({uploadResult.errors.length})
-              </h4>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {uploadResult.errors.map((error, index) => (
-                  <p key={index} className="text-sm text-red-600 bg-red-50 p-2 rounded">
-                    {error}
-                  </p>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={() => {
-              setUploadResult(null);
-              setFile(null);
-            }}
-            className="mt-6 px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors font-semibold"
-          >
-            Upload Another File
-          </button>
-        </motion.div>
-      )}
-
-      {/* Instructions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="bg-blue-50 border border-blue-200 rounded-lg p-6"
-      >
-        <h4 className="font-bold text-navy mb-3">📋 Required Columns in Your File</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
-          <div>
-            <p className="font-semibold text-navy mb-2">Required Fields:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>USN</li>
-              <li>StudentName</li>
-              <li>Department</li>
-              <li>Semester</li>
-              <li>Section</li>
-              <li>AttendancePercentage</li>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+            <p className="font-bold text-slate-900 dark:text-white">Required Headers (8):</p>
+            <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
+              <li>&bull; EmployeeID (unique identifier)</li>
+              <li>&bull; EmployeeName</li>
+              <li>&bull; Department (Engineering, Sales, etc.)</li>
+              <li>&bull; Designation (Job Title)</li>
+              <li>&bull; Experience (years, positive number)</li>
+              <li>&bull; AttendancePercentage (0 - 100)</li>
+              <li>&bull; PerformanceScore (0 - 100)</li>
+              <li>&bull; ProductivityScore (0 - 100)</li>
             </ul>
           </div>
-          <div>
-            <p className="font-semibold text-navy mb-2">Optional Fields:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Subject1-5Marks</li>
-              <li>InternalMarks</li>
-              <li>GPA / CGPA</li>
-              <li>Email, Phone</li>
-              <li>Parent/Counselor Info</li>
+
+          <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+            <p className="font-bold text-slate-900 dark:text-white">Optional Headers (Supported):</p>
+            <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
+              <li>&bull; Salary, JoiningDate</li>
+              <li>&bull; ProjectsCompleted, TasksCompleted</li>
+              <li>&bull; TargetCompletionRate (0 - 100)</li>
+              <li>&bull; ManagerName</li>
+              <li>&bull; Skills (comma-separated list)</li>
+              <li>&bull; TrainingHours, QualityScore</li>
+              <li>&bull; Email, Phone</li>
             </ul>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

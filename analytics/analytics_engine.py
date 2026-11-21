@@ -1,759 +1,762 @@
-import pandas as pd
 import numpy as np
-from typing import List, Dict, Tuple
-from models import StudentData
+import pandas as pd
+from scipy import stats
+from sklearn.linear_model import LinearRegression
+from typing import List, Dict, Any, Tuple, Optional
+from models import (
+    EmployeeData, KPISummary, DepartmentMetric, StatisticalInsightsResponse,
+    InsightItem, DistributionsResponse, DistributionBucket, PredictionResponse,
+    RiskAssessmentResponse, RiskAssessmentItem, EmployeeDeepDiveResponse
+)
 
 class AnalyticsEngine:
-    """Core analytics engine for student performance analysis"""
-    
+    """
+    Enterprise Workforce Analytics & Machine Learning Engine
+    Executes vectorized computations, statistical correlation testing,
+    predictive performance regression, and automated risk scoring.
+    """
+
     @staticmethod
-    def create_dataframe(students: List[StudentData]) -> pd.DataFrame:
-        """Convert student list to pandas DataFrame"""
-        data = [s.dict() for s in students]
+    def to_dataframe(employees: List[EmployeeData]) -> pd.DataFrame:
+        if not employees:
+            return pd.DataFrame()
+        data = [e.model_dump() for e in employees]
         df = pd.DataFrame(data)
-        return df
-    
-    @staticmethod
-    def calculate_average_marks(df: pd.DataFrame) -> pd.Series:
-        """Calculate average marks for each student"""
-        subject_columns = ['subject1Marks', 'subject2Marks', 'subject3Marks', 
-                          'subject4Marks', 'subject5Marks']
-        avg_marks = df[subject_columns].mean(axis=1)
-        return avg_marks
-    
-    @staticmethod
-    def identify_weak_subjects(student_data: StudentData) -> List[str]:
-        """Identify weak subjects for a student"""
-        subject_marks = {
-            'Subject 1': student_data.subject1Marks,
-            'Subject 2': student_data.subject2Marks,
-            'Subject 3': student_data.subject3Marks,
-            'Subject 4': student_data.subject4Marks,
-            'Subject 5': student_data.subject5Marks
-        }
-        
-        # Weak if marks < 40
-        weak_subjects = [subject for subject, marks in subject_marks.items() 
-                        if marks < 40]
-        return weak_subjects
-    
-    @staticmethod
-    def identify_strong_subjects(student_data: StudentData) -> List[str]:
-        """Identify strong subjects for a student"""
-        subject_marks = {
-            'Subject 1': student_data.subject1Marks,
-            'Subject 2': student_data.subject2Marks,
-            'Subject 3': student_data.subject3Marks,
-            'Subject 4': student_data.subject4Marks,
-            'Subject 5': student_data.subject5Marks
-        }
-        
-        # Strong if marks >= 80
-        strong_subjects = [subject for subject, marks in subject_marks.items() 
-                          if marks >= 80]
-        return strong_subjects
-    
-    @staticmethod
-    def classify_performance(gpa: float, attendance: float, avg_marks: float) -> str:
-        """Classify student performance"""
-        if gpa >= 8.5 and attendance >= 90 and avg_marks >= 85:
-            return "Excellent"
-        elif gpa >= 7.5 and attendance >= 75:
-            return "Very Good"
-        elif gpa >= 6.5 and attendance >= 75:
-            return "Good"
-        elif gpa >= 5.5 and attendance >= 60:
-            return "Average"
-        else:
-            return "Poor"
-    
-    @staticmethod
-    def determine_risk_level(attendance: float, gpa: float, avg_marks: float) -> str:
-        """Determine student risk level"""
-        if attendance < 75:
-            return "High"
-        elif attendance < 80 or gpa < 5.5 or avg_marks < 40:
-            return "Medium"
-        else:
-            return "Low"
-    
-    @staticmethod
-    def identify_detained_students(students: List[StudentData]) -> List[Dict]:
-        """Identify students with attendance < 75%"""
-        detained = []
-        
-        for student in students:
-            if student.attendancePercentage < 75:
-                avg_marks = np.mean([
-                    student.subject1Marks, student.subject2Marks,
-                    student.subject3Marks, student.subject4Marks,
-                    student.subject5Marks
-                ])
-                
-                risk_level = AnalyticsEngine.determine_risk_level(
-                    student.attendancePercentage, student.gpa, avg_marks
-                )
-                
-                detention_record = {
-                    'usn': student.usn,
-                    'studentName': student.studentName,
-                    'department': student.department,
-                    'semester': student.semester,
-                    'section': student.section,
-                    'attendancePercentage': student.attendancePercentage,
-                    'gpa': student.gpa,
-                    'detentionReason': 'Attendance below 75%',
-                    'riskLevel': risk_level,
-                    'counselorRecommendation': f"Immediate counseling required. Attendance: {student.attendancePercentage}%"
-                }
-                detained.append(detention_record)
-        
-        return detained
-    
-    @staticmethod
-    def calculate_statistics(students: List[StudentData]) -> Dict:
-        """Calculate statistical measures"""
-        df = AnalyticsEngine.create_dataframe(students)
-        
-        # GPA statistics
-        gpa_values = df['gpa'].dropna()
-        
-        # Attendance statistics
-        attendance_values = df['attendancePercentage']
-        
-        # Average marks
-        subject_columns = ['subject1Marks', 'subject2Marks', 'subject3Marks', 
-                          'subject4Marks', 'subject5Marks']
-        avg_marks = df[subject_columns].mean().mean()
-        
-        # Correlation between attendance and GPA
-        correlation = attendance_values.corr(gpa_values)
-        
-        # Risk students
-        risk_students = df[df['attendancePercentage'] < 75]
-        
-        return {
-            'mean_gpa': float(gpa_values.mean()),
-            'median_gpa': float(gpa_values.median()),
-            'std_gpa': float(gpa_values.std()),
-            'min_gpa': float(gpa_values.min()),
-            'max_gpa': float(gpa_values.max()),
-            'mean_attendance': float(attendance_values.mean()),
-            'median_attendance': float(attendance_values.median()),
-            'std_attendance': float(attendance_values.std()),
-            'mean_marks': float(avg_marks),
-            'correlation_attendance_gpa': float(correlation) if not np.isnan(correlation) else 0,
-            'students_at_risk': len(risk_students),
-            'total_students': len(df)
-        }
-    
-    @staticmethod
-    def identify_top_performers(students: List[StudentData], limit: int = 10) -> List[Dict]:
-        """Identify top performing students"""
-        df = AnalyticsEngine.create_dataframe(students)
-        top_students = df.nlargest(limit, 'gpa')
-        
-        return top_students.to_dict(orient='records')
-    
-    @staticmethod
-    def identify_weak_performers(students: List[StudentData], limit: int = 10) -> List[Dict]:
-        """Identify weak performing students"""
-        df = AnalyticsEngine.create_dataframe(students)
-        weak_students = df.nsmallest(limit, 'gpa')
-        
-        return weak_students.to_dict(orient='records')
-    
-    @staticmethod
-    def department_analysis(students: List[StudentData]) -> Dict:
-        """Analyze performance by department"""
-        df = AnalyticsEngine.create_dataframe(students)
-        
-        analysis = {}
-        for dept in df['department'].unique():
-            dept_data = df[df['department'] == dept]
-            
-            analysis[dept] = {
-                'total_students': len(dept_data),
-                'mean_gpa': float(dept_data['gpa'].mean()),
-                'mean_attendance': float(dept_data['attendancePercentage'].mean()),
-                'detained_count': len(dept_data[dept_data['attendancePercentage'] < 75]),
-                'pass_rate': float((dept_data['gpa'] >= 5.5).sum() / len(dept_data) * 100)
-            }
-        
-        return analysis
-    
-    @staticmethod
-    def semester_analysis(students: List[StudentData]) -> Dict:
-        """Analyze performance by semester"""
-        df = AnalyticsEngine.create_dataframe(students)
-        
-        analysis = {}
-        for sem in sorted(df['semester'].unique()):
-            sem_data = df[df['semester'] == sem]
-            
-            analysis[f'Semester {int(sem)}'] = {
-                'total_students': len(sem_data),
-                'mean_gpa': float(sem_data['gpa'].mean()),
-                'mean_attendance': float(sem_data['attendancePercentage'].mean()),
-                'detained_count': len(sem_data[sem_data['attendancePercentage'] < 75])
-            }
-        
-        return analysis
-    
-    @staticmethod
-    def gpa_distribution(students: List[StudentData]) -> Dict:
-        """Get GPA distribution"""
-        df = AnalyticsEngine.create_dataframe(students)
-        
-        ranges = {
-            'Excellent (8.5-10)': len(df[df['gpa'] >= 8.5]),
-            'Very Good (7.5-8.5)': len(df[(df['gpa'] >= 7.5) & (df['gpa'] < 8.5)]),
-            'Good (6.5-7.5)': len(df[(df['gpa'] >= 6.5) & (df['gpa'] < 7.5)]),
-            'Average (5.5-6.5)': len(df[(df['gpa'] >= 5.5) & (df['gpa'] < 6.5)]),
-            'Poor (<5.5)': len(df[df['gpa'] < 5.5])
-        }
-        
-        return ranges
-    
-    @staticmethod
-    def attendance_distribution(students: List[StudentData]) -> Dict:
-        """Get attendance distribution"""
-        df = AnalyticsEngine.create_dataframe(students)
-        
-        ranges = {
-            'Excellent (>= 90)': len(df[df['attendancePercentage'] >= 90]),
-            'Good (80-90)': len(df[(df['attendancePercentage'] >= 80) & (df['attendancePercentage'] < 90)]),
-            'Average (75-80)': len(df[(df['attendancePercentage'] >= 75) & (df['attendancePercentage'] < 80)]),
-            'Poor (< 75)': len(df[df['attendancePercentage'] < 75])
-        }
-        
-        return ranges
 
-    # ─── NEW: ML & Advanced Analytics Methods ─────────────────────────────────
-
-    @staticmethod
-    def calculate_risk_score(student: StudentData) -> Dict:
-        """Calculate composite risk score (0-100) for a student.
-        Higher score = higher risk."""
-        avg_marks = np.mean([
-            student.subject1Marks, student.subject2Marks,
-            student.subject3Marks, student.subject4Marks,
-            student.subject5Marks
-        ])
-
-        risk_score = 0.0
-
-        # Attendance factor (max 35 pts)
-        if student.attendancePercentage < 60:
-            risk_score += 35
-        elif student.attendancePercentage < 70:
-            risk_score += 25
-        elif student.attendancePercentage < 75:
-            risk_score += 18
-        elif student.attendancePercentage < 80:
-            risk_score += 8
-
-        # GPA factor (max 25 pts)
-        if student.gpa < 4.0:
-            risk_score += 25
-        elif student.gpa < 5.0:
-            risk_score += 18
-        elif student.gpa < 5.5:
-            risk_score += 12
-        elif student.gpa < 6.5:
-            risk_score += 5
-
-        # Internal marks factor (max 15 pts)
-        if student.internalMarks < 15:
-            risk_score += 15
-        elif student.internalMarks < 20:
-            risk_score += 10
-        elif student.internalMarks < 25:
-            risk_score += 5
-
-        # Subject failures factor (max 15 pts)
-        weak_count = sum(1 for m in [
-            student.subject1Marks, student.subject2Marks,
-            student.subject3Marks, student.subject4Marks,
-            student.subject5Marks
-        ] if m < 40)
-        risk_score += min(weak_count * 5, 15)
-
-        # Average marks factor (max 10 pts)
-        if avg_marks < 35:
-            risk_score += 10
-        elif avg_marks < 45:
-            risk_score += 6
-        elif avg_marks < 55:
-            risk_score += 3
-
-        risk_score = min(risk_score, 100)
-
-        # Classify
-        if risk_score >= 60:
-            level = "High Risk"
-        elif risk_score >= 35:
-            level = "Medium Risk"
-        else:
-            level = "Low Risk"
-
-        return {
-            'risk_score': round(risk_score, 1),
-            'risk_level': level,
-            'factors': {
-                'attendance': student.attendancePercentage,
-                'gpa': student.gpa,
-                'internal_marks': student.internalMarks,
-                'weak_subjects': weak_count,
-                'avg_marks': round(avg_marks, 2)
-            }
-        }
-
-    @staticmethod
-    def predict_gpa(students: List[StudentData]) -> List[Dict]:
-        """Use Linear Regression to predict GPA from attendance + internal marks."""
-        from sklearn.linear_model import LinearRegression
-
-        df = AnalyticsEngine.create_dataframe(students)
-
-        subject_cols = ['subject1Marks', 'subject2Marks', 'subject3Marks',
-                        'subject4Marks', 'subject5Marks']
-        df['avg_marks'] = df[subject_cols].mean(axis=1)
-
-        features = df[['attendancePercentage', 'internalMarks', 'avg_marks']].values
-        target = df['gpa'].values
-
-        model = LinearRegression()
-        model.fit(features, target)
-        predictions = model.predict(features)
-
-        # Clamp predictions to valid GPA range
-        predictions = np.clip(predictions, 0, 10)
-
-        results = []
-        for i, student in enumerate(students):
-            results.append({
-                'usn': student.usn,
-                'studentName': student.studentName,
-                'current_gpa': student.gpa,
-                'predicted_gpa': round(float(predictions[i]), 2),
-                'difference': round(float(predictions[i]) - student.gpa, 2)
-            })
-
-        r_squared = model.score(features, target)
-
-        return {
-            'predictions': results,
-            'model_info': {
-                'r_squared': round(float(r_squared), 4),
-                'features_used': ['attendancePercentage', 'internalMarks', 'avg_marks'],
-                'model_type': 'Linear Regression'
-            }
-        }
-
-    @staticmethod
-    def calculate_academic_health_index(student: StudentData) -> Dict:
-        """Generate Academic Health Index (0-100) based on weighted factors."""
-        avg_marks = np.mean([
-            student.subject1Marks, student.subject2Marks,
-            student.subject3Marks, student.subject4Marks,
-            student.subject5Marks
-        ])
-
-        # Weighted components
-        attendance_score = (student.attendancePercentage / 100) * 30  # 30% weight
-        gpa_score = (student.gpa / 10) * 40  # 40% weight
-        marks_score = (avg_marks / 100) * 20  # 20% weight
-        internal_score = (student.internalMarks / 50) * 10  # 10% weight
-
-        health_index = round(attendance_score + gpa_score + marks_score + internal_score, 1)
-        health_index = min(health_index, 100)
-
-        # Classification
-        if health_index >= 85:
-            classification = "Excellent"
-        elif health_index >= 70:
-            classification = "Good"
-        elif health_index >= 55:
-            classification = "Average"
-        elif health_index >= 40:
-            classification = "Needs Improvement"
-        else:
-            classification = "Critical"
-
-        return {
-            'health_index': health_index,
-            'classification': classification,
-            'breakdown': {
-                'attendance_component': round(attendance_score, 1),
-                'gpa_component': round(gpa_score, 1),
-                'marks_component': round(marks_score, 1),
-                'internal_component': round(internal_score, 1)
-            }
-        }
-
-    @staticmethod
-    def generate_dynamic_insights(students: List[StudentData]) -> List[Dict]:
-        """Generate dynamic insight statements from data analysis."""
-        df = AnalyticsEngine.create_dataframe(students)
-        insights = []
-
-        if len(df) == 0:
-            return [{'type': 'info', 'message': 'No data available to generate insights.'}]
-
-        # 1. Correlation insight
-        corr = df['attendancePercentage'].corr(df['gpa'])
-        if not np.isnan(corr):
-            if abs(corr) >= 0.7:
-                strength = "strong"
-            elif abs(corr) >= 0.4:
-                strength = "moderate"
+        # Ensure correct numeric types with sane defaults
+        numeric_cols = [
+            'experience', 'attendancePercentage', 'performanceScore',
+            'productivityScore', 'qualityScore', 'targetCompletionRate',
+            'projectsCompleted', 'tasksCompleted', 'salary', 'trainingHours'
+        ]
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
             else:
-                strength = "weak"
-            direction = "positive" if corr > 0 else "negative"
-            insights.append({
-                'type': 'correlation',
-                'icon': 'trending',
-                'message': f"Attendance and GPA have a {strength} {direction} relationship (r = {corr:.2f})."
-            })
+                df[col] = 0.0
 
-        # 2. Best performing department
-        dept_stats = df.groupby('department').agg(
-            mean_gpa=('gpa', 'mean'),
-            mean_attendance=('attendancePercentage', 'mean')
-        ).reset_index()
+        # Calculate Task Completion Score (0-100 based on standard tasks benchmark)
+        # Standard benchmark: ~20 tasks completed per quarter/eval period
+        df['taskCompletionScore'] = np.clip(df['tasksCompleted'] * 5.0, 0, 100)
+        df.loc[df['tasksCompleted'] == 0, 'taskCompletionScore'] = np.clip(df['targetCompletionRate'], 0, 100)
 
-        if len(dept_stats) > 0:
-            best_dept = dept_stats.loc[dept_stats['mean_gpa'].idxmax()]
-            insights.append({
-                'type': 'positive',
-                'icon': 'trophy',
-                'message': f"{best_dept['department']} department achieved the highest average GPA ({best_dept['mean_gpa']:.2f})."
-            })
+        # Vectorized Employee Performance Index (EPI):
+        # EPI = (30% * Productivity) + (25% * Quality) + (20% * Attendance) + (15% * TargetAchievement) + (10% * TaskCompletion)
+        df['epi'] = (
+            (0.30 * df['productivityScore']) +
+            (0.25 * df['qualityScore']) +
+            (0.20 * df['attendancePercentage']) +
+            (0.15 * df['targetCompletionRate']) +
+            (0.10 * df['taskCompletionScore'])
+        ).round(2)
 
-            # Worst performing department
-            worst_dept = dept_stats.loc[dept_stats['mean_gpa'].idxmin()]
-            if worst_dept['department'] != best_dept['department']:
-                insights.append({
-                    'type': 'warning',
-                    'icon': 'alert',
-                    'message': f"{worst_dept['department']} department has the lowest average GPA ({worst_dept['mean_gpa']:.2f}) and needs attention."
-                })
+        # Determine Category
+        conditions = [
+            df['epi'] >= 85.0,
+            (df['epi'] >= 75.0) & (df['epi'] < 85.0),
+            (df['epi'] >= 65.0) & (df['epi'] < 75.0),
+            (df['epi'] >= 50.0) & (df['epi'] < 65.0),
+            df['epi'] < 50.0
+        ]
+        categories = ['Excellent', 'Good', 'Average', 'Needs Improvement', 'Critical']
+        df['performanceCategory'] = np.select(conditions, categories, default='Average')
 
-        # 3. Detention rate by department
-        detained_df = df[df['attendancePercentage'] < 75]
-        if len(detained_df) > 0:
-            dept_detention = detained_df.groupby('department').size().reset_index(name='count')
-            dept_totals = df.groupby('department').size().reset_index(name='total')
-            merged = dept_detention.merge(dept_totals, on='department')
-            merged['rate'] = (merged['count'] / merged['total'] * 100).round(1)
-            worst_detention = merged.loc[merged['rate'].idxmax()]
-            insights.append({
-                'type': 'danger',
-                'icon': 'alert',
-                'message': f"{worst_detention['department']} department has the highest detention rate ({worst_detention['rate']}%)."
-            })
+        # Determine Risk Level
+        risk_conditions = [
+            (df['epi'] < 50.0) | ((df['performanceScore'] < 50.0) & (df['attendancePercentage'] < 70.0)),
+            (df['epi'] < 65.0) | (df['performanceScore'] < 60.0) | (df['attendancePercentage'] < 75.0),
+            (df['epi'] < 75.0) | (df['performanceScore'] < 70.0),
+            (df['epi'] >= 75.0) & (df['performanceScore'] >= 70.0)
+        ]
+        risks = ['Critical', 'High', 'Medium', 'Low']
+        df['riskLevel'] = np.select(risk_conditions, risks, default='Medium')
 
-        # 4. Risk students count
-        risk_count = len(df[(df['attendancePercentage'] < 75) | (df['gpa'] < 5)])
-        if risk_count > 0:
-            insights.append({
-                'type': 'danger',
-                'icon': 'warning',
-                'message': f"{risk_count} students are classified as academically at-risk (attendance <75% or GPA <5)."
-            })
+        return df
 
-        # 5. Semester trend insights
-        sem_stats = df.groupby('semester').agg(
-            mean_attendance=('attendancePercentage', 'mean')
-        ).sort_index()
-        if len(sem_stats) >= 2:
-            # Find semesters with declining attendance
-            for i in range(1, len(sem_stats)):
-                curr_sem = sem_stats.index[i]
-                prev_sem = sem_stats.index[i - 1]
-                drop = sem_stats.loc[prev_sem, 'mean_attendance'] - sem_stats.loc[curr_sem, 'mean_attendance']
-                if drop > 5:
-                    insights.append({
-                        'type': 'warning',
-                        'icon': 'trending_down',
-                        'message': f"Semester {int(curr_sem)} shows declining attendance compared to Semester {int(prev_sem)} (drop of {drop:.1f}%)."
-                    })
-
-        # 6. Overall pass rate
-        pass_rate = (df['gpa'] >= 5.5).sum() / len(df) * 100
-        if pass_rate >= 80:
-            insights.append({
-                'type': 'positive',
-                'icon': 'check',
-                'message': f"Overall pass rate is strong at {pass_rate:.1f}%."
-            })
-        elif pass_rate < 60:
-            insights.append({
-                'type': 'danger',
-                'icon': 'alert',
-                'message': f"Overall pass rate is concerning at {pass_rate:.1f}%."
-            })
-
-        # 7. High-performing students
-        excellent_count = len(df[df['gpa'] >= 8.5])
-        if excellent_count > 0:
-            pct = (excellent_count / len(df) * 100)
-            insights.append({
-                'type': 'positive',
-                'icon': 'star',
-                'message': f"{excellent_count} students ({pct:.1f}%) have achieved Excellent GPA (≥8.5)."
-            })
-
-        return insights
-
-    @staticmethod
-    def department_ranking(students: List[StudentData]) -> List[Dict]:
-        """Rank departments using weighted formula:
-        40% GPA + 30% Attendance + 20% Pass% + 10% Detention Rate (inverted)"""
-        df = AnalyticsEngine.create_dataframe(students)
-
-        if len(df) == 0:
-            return []
-
-        rankings = []
-        for dept in df['department'].unique():
-            dept_data = df[df['department'] == dept]
-            total = len(dept_data)
-            mean_gpa = float(dept_data['gpa'].mean())
-            mean_att = float(dept_data['attendancePercentage'].mean())
-            pass_pct = float((dept_data['gpa'] >= 5.5).sum() / total * 100)
-            detained_count = len(dept_data[dept_data['attendancePercentage'] < 75])
-            detention_rate = (detained_count / total * 100)
-
-            # Normalize to 0-100 scales
-            gpa_norm = (mean_gpa / 10) * 100
-            att_norm = mean_att  # already 0-100
-            pass_norm = pass_pct  # already 0-100
-            detention_norm = 100 - detention_rate  # invert: lower detention = higher score
-
-            weighted_score = (
-                gpa_norm * 0.40 +
-                att_norm * 0.30 +
-                pass_norm * 0.20 +
-                detention_norm * 0.10
+    @classmethod
+    def calculate_kpis(cls, employees: List[EmployeeData]) -> KPISummary:
+        df = cls.to_dataframe(employees)
+        if df.empty:
+            return KPISummary(
+                totalEmployees=0,
+                averagePerformance=0.0,
+                averageAttendance=0.0,
+                averageProductivity=0.0,
+                averageTargetAchievement=0.0,
+                averageQualityScore=0.0,
+                highPerformersCount=0,
+                underperformingCount=0,
+                criticalRiskCount=0,
+                totalProjectsCompleted=0,
+                totalTrainingHours=0.0
             )
 
-            # Find top student
-            top_student = dept_data.loc[dept_data['gpa'].idxmax()]
+        high_performers = int((df['performanceScore'] >= 80.0).sum())
+        underperforming = int((df['performanceScore'] < 60.0).sum())
+        critical_risk = int((df['riskLevel'] == 'Critical').sum())
 
-            # Average subject marks
-            subject_cols = ['subject1Marks', 'subject2Marks', 'subject3Marks',
-                           'subject4Marks', 'subject5Marks']
-            avg_subject_marks = float(dept_data[subject_cols].mean().mean())
-
-            rankings.append({
-                'department': dept,
-                'weighted_score': round(weighted_score, 2),
-                'total_students': total,
-                'mean_gpa': round(mean_gpa, 2),
-                'mean_attendance': round(mean_att, 2),
-                'pass_percentage': round(pass_pct, 2),
-                'fail_percentage': round(100 - pass_pct, 2),
-                'detained_count': detained_count,
-                'detention_rate': round(detention_rate, 2),
-                'top_student': {
-                    'usn': top_student['usn'],
-                    'name': top_student['studentName'],
-                    'gpa': float(top_student['gpa'])
-                },
-                'avg_subject_marks': round(avg_subject_marks, 2)
-            })
-
-        rankings.sort(key=lambda x: x['weighted_score'], reverse=True)
-        for i, r in enumerate(rankings):
-            r['rank'] = i + 1
-
-        return rankings
-
-    @staticmethod
-    def classify_detention_priority(student: StudentData) -> Dict:
-        """Classify detention priority level and generate intervention suggestions."""
-        avg_marks = np.mean([
-            student.subject1Marks, student.subject2Marks,
-            student.subject3Marks, student.subject4Marks,
-            student.subject5Marks
-        ])
-        weak_count = sum(1 for m in [
-            student.subject1Marks, student.subject2Marks,
-            student.subject3Marks, student.subject4Marks,
-            student.subject5Marks
-        ] if m < 40)
-
-        reasons = []
-        if student.attendancePercentage < 75:
-            reasons.append('Low Attendance')
-        if student.gpa < 5.0:
-            reasons.append('Low GPA')
-        if weak_count >= 3:
-            reasons.append('Multiple Backlogs')
-
-        # Priority classification
-        severity = 0
-        if student.attendancePercentage < 60:
-            severity += 3
-        elif student.attendancePercentage < 70:
-            severity += 2
-        elif student.attendancePercentage < 75:
-            severity += 1
-
-        if student.gpa < 4.0:
-            severity += 3
-        elif student.gpa < 5.0:
-            severity += 2
-        elif student.gpa < 5.5:
-            severity += 1
-
-        if weak_count >= 4:
-            severity += 2
-        elif weak_count >= 2:
-            severity += 1
-
-        if severity >= 6:
-            priority = 'Critical'
-        elif severity >= 4:
-            priority = 'High'
-        elif severity >= 2:
-            priority = 'Medium'
-        else:
-            priority = 'Low'
-
-        # Generate intervention suggestions
-        interventions = []
-        if priority == 'Critical':
-            interventions.append('Immediate meeting with HOD and parents')
-            interventions.append('Daily attendance monitoring')
-            interventions.append('Assign dedicated academic mentor')
-        if priority in ('Critical', 'High'):
-            interventions.append('Immediate faculty counseling session')
-            interventions.append('Weekly progress review meetings')
-        if 'Low Attendance' in reasons:
-            interventions.append('Attendance monitoring and daily check-in')
-            interventions.append('Identify and address root cause of absenteeism')
-        if 'Low GPA' in reasons:
-            interventions.append('Enroll in remedial classes')
-            interventions.append('Peer tutoring program')
-        if 'Multiple Backlogs' in reasons:
-            interventions.append('Subject-specific tutoring for backlog subjects')
-            interventions.append('Structured study plan with milestone tracking')
-        if not interventions:
-            interventions.append('Academic counseling recommended')
-
-        return {
-            'priority': priority,
-            'severity_score': severity,
-            'reasons': reasons,
-            'interventions': interventions,
-            'category': 'Multiple Reasons' if len(reasons) > 1 else (reasons[0] if reasons else 'Other')
-        }
-
-    @staticmethod
-    def generate_student_recommendations(student: StudentData) -> Dict:
-        """Generate per-student strengths, weaknesses, and recommendations."""
-        avg_marks = np.mean([
-            student.subject1Marks, student.subject2Marks,
-            student.subject3Marks, student.subject4Marks,
-            student.subject5Marks
-        ])
-
-        strong_subjects = AnalyticsEngine.identify_strong_subjects(student)
-        weak_subjects = AnalyticsEngine.identify_weak_subjects(student)
-        performance = AnalyticsEngine.classify_performance(
-            student.gpa, student.attendancePercentage, avg_marks
+        return KPISummary(
+            totalEmployees=len(df),
+            averagePerformance=round(float(df['performanceScore'].mean()), 2),
+            averageAttendance=round(float(df['attendancePercentage'].mean()), 2),
+            averageProductivity=round(float(df['productivityScore'].mean()), 2),
+            averageTargetAchievement=round(float(df['targetCompletionRate'].mean()), 2),
+            averageQualityScore=round(float(df['qualityScore'].mean()), 2),
+            highPerformersCount=high_performers,
+            underperformingCount=underperforming,
+            criticalRiskCount=critical_risk,
+            totalProjectsCompleted=int(df['projectsCompleted'].sum()),
+            totalTrainingHours=round(float(df['trainingHours'].sum()), 1)
         )
 
+    @classmethod
+    def generate_insights(cls, employees: List[EmployeeData]) -> StatisticalInsightsResponse:
+        df = cls.to_dataframe(employees)
+        if df.empty or len(df) < 2:
+            return StatisticalInsightsResponse(
+                correlationAttendancePerformance=0.0,
+                correlationProductivityPerformance=0.0,
+                attendancePValue=1.0,
+                productivityPValue=1.0,
+                bestDepartment={},
+                lowestDepartment={},
+                productivityDropDepartments=[],
+                insights=[]
+            )
+
+        insights: List[InsightItem] = []
+
+        # 1. Pearson Correlation: Attendance vs Performance
+        r_att, p_att = 0.0, 1.0
+        if df['attendancePercentage'].std() > 0 and df['performanceScore'].std() > 0:
+            res = stats.pearsonr(df['attendancePercentage'], df['performanceScore'])
+            r_att, p_att = float(res.statistic), float(res.pvalue)
+
+        att_desc = (
+            f"Strong positive correlation (r = {r_att:.2f}, p < {p_att:.3f}): attendance is a primary driver of performance."
+            if r_att >= 0.5 else
+            f"Moderate positive correlation (r = {r_att:.2f}): regular attendance moderately reinforces performance scores."
+            if r_att > 0.2 else
+            f"Low correlation (r = {r_att:.2f}): attendance variability does not directly correspond with performance variations."
+        )
+        insights.append(InsightItem(
+            id="insight-att-corr",
+            type="correlation",
+            title="Attendance & Performance Correlation",
+            description=att_desc,
+            severity="info" if r_att >= 0.3 else "warning",
+            metricValue=round(r_att, 2),
+            metadata={"pValue": round(p_att, 4), "variableA": "Attendance", "variableB": "Performance"}
+        ))
+
+        # 2. Pearson Correlation: Productivity vs Performance
+        r_prod, p_prod = 0.0, 1.0
+        if df['productivityScore'].std() > 0 and df['performanceScore'].std() > 0:
+            res = stats.pearsonr(df['productivityScore'], df['performanceScore'])
+            r_prod, p_prod = float(res.statistic), float(res.pvalue)
+
+        insights.append(InsightItem(
+            id="insight-prod-corr",
+            type="correlation",
+            title="Productivity & Performance Relationship",
+            description=f"Productivity score exhibits an r = {r_prod:.2f} alignment with evaluated performance ratings.",
+            severity="success" if r_prod >= 0.6 else "info",
+            metricValue=round(r_prod, 2)
+        ))
+
+        # 3. Department Benchmarking Analysis
+        dept_grouped = df.groupby('department').agg(
+            avg_perf=('performanceScore', 'mean'),
+            avg_prod=('productivityScore', 'mean'),
+            avg_att=('attendancePercentage', 'mean'),
+            avg_target=('targetCompletionRate', 'mean'),
+            headcount=('employeeId', 'count')
+        ).reset_index()
+
+        # Weighted Formula: (40% * Performance) + (30% * Productivity) + (20% * Attendance) + (10% * TargetAchievement)
+        dept_grouped['score'] = (
+            (0.40 * dept_grouped['avg_perf']) +
+            (0.30 * dept_grouped['avg_prod']) +
+            (0.20 * dept_grouped['avg_att']) +
+            (0.10 * dept_grouped['avg_target'])
+        ).round(2)
+
+        dept_sorted = dept_grouped.sort_values(by='score', ascending=False)
+        best_dept_row = dept_sorted.iloc[0].to_dict()
+        lowest_dept_row = dept_sorted.iloc[-1].to_dict()
+
+        insights.append(InsightItem(
+            id="insight-top-dept",
+            type="top_department",
+            title=f"Top Performing Department: {best_dept_row['department']}",
+            description=f"{best_dept_row['department']} leads organizational benchmarks with a composite efficiency score of {best_dept_row['score']:.1f}% and an average performance of {best_dept_row['avg_perf']:.1f}%.",
+            severity="success",
+            metricValue=float(best_dept_row['score']),
+            metadata=best_dept_row
+        ))
+
+        if len(dept_sorted) > 1 and lowest_dept_row['department'] != best_dept_row['department']:
+            insights.append(InsightItem(
+                id="insight-lowest-dept",
+                type="department_attention",
+                title=f"Performance Gap: {lowest_dept_row['department']}",
+                description=f"{lowest_dept_row['department']} exhibits lowest aggregate efficiency at {lowest_dept_row['score']:.1f}%. Targeted coaching and workload evaluation recommended.",
+                severity="warning",
+                metricValue=float(lowest_dept_row['score']),
+                metadata=lowest_dept_row
+            ))
+
+        # 4. Productivity Drop & Anomaly Detection
+        mean_prod = df['productivityScore'].mean()
+        prod_drop_depts = []
+        for _, row in dept_grouped.iterrows():
+            if row['avg_prod'] < (mean_prod - 5.0):
+                prod_drop_depts.append({
+                    "department": row['department'],
+                    "avgProductivity": round(float(row['avg_prod']), 2),
+                    "companyAverage": round(float(mean_prod), 2),
+                    "delta": round(float(row['avg_prod'] - mean_prod), 2)
+                })
+
+        if prod_drop_depts:
+            dept_names = ", ".join([d['department'] for d in prod_drop_depts])
+            insights.append(InsightItem(
+                id="insight-prod-drop",
+                type="productivity_drop",
+                title="Departmental Productivity Deficit Detected",
+                description=f"{dept_names} fall noticeably below company average productivity ({mean_prod:.1f}%). Prioritize process review.",
+                severity="danger",
+                metadata={"affectedDepartments": prod_drop_depts}
+            ))
+
+        # 5. Underperformance Risk Alert
+        critical_count = int((df['riskLevel'] == 'Critical').sum())
+        high_count = int((df['riskLevel'] == 'High').sum())
+        total_at_risk = critical_count + high_count
+
+        if total_at_risk > 0:
+            insights.append(InsightItem(
+                id="insight-risk-alert",
+                type="risk_alert",
+                title=f"{total_at_risk} Employees Require Immediate Managerial Intervention",
+                description=f"{critical_count} critical and {high_count} high-priority employees identified with combined deficits across attendance, quality, or target completion.",
+                severity="danger" if critical_count > 0 else "warning",
+                metricValue=float(total_at_risk)
+            ))
+
+        # 6. Opportunity / Positive Insight
+        high_performers = int((df['performanceScore'] >= 85.0).sum())
+        if high_performers > 0:
+            pct = round((high_performers / len(df)) * 100, 1)
+            insights.append(InsightItem(
+                id="insight-talent-opp",
+                type="opportunity",
+                title=f"High Performer Talent Pool ({pct}% of Workforce)",
+                description=f"{high_performers} employees maintain scores above 85%. Ideal candidates for mentorship, leadership pipelines, and cross-functional projects.",
+                severity="success",
+                metricValue=float(high_performers)
+            ))
+
+        return StatisticalInsightsResponse(
+            correlationAttendancePerformance=round(r_att, 4),
+            correlationProductivityPerformance=round(r_prod, 4),
+            attendancePValue=round(p_att, 6),
+            productivityPValue=round(p_prod, 6),
+            bestDepartment=best_dept_row,
+            lowestDepartment=lowest_dept_row,
+            productivityDropDepartments=prod_drop_depts,
+            insights=insights
+        )
+
+    @classmethod
+    def calculate_distributions(cls, employees: List[EmployeeData]) -> DistributionsResponse:
+        df = cls.to_dataframe(employees)
+        if df.empty:
+            return DistributionsResponse(
+                performanceDistribution=[],
+                attendanceDistribution=[],
+                categoryRatios=[],
+                riskRatios=[],
+                departmentComparisons=[],
+                productivityVsTarget=[],
+                top10Performers=[],
+                bottom10Performers=[]
+            )
+
+        total = len(df)
+
+        # Performance Distribution Histogram
+        perf_bins = [
+            ("Poor (<50)", (df['performanceScore'] < 50).sum(), "#ef4444"),
+            ("Needs Imp. (50-64)", ((df['performanceScore'] >= 50) & (df['performanceScore'] < 65)).sum(), "#f97316"),
+            ("Average (65-74)", ((df['performanceScore'] >= 65) & (df['performanceScore'] < 75)).sum(), "#eab308"),
+            ("Good (75-84)", ((df['performanceScore'] >= 75) & (df['performanceScore'] < 85)).sum(), "#3b82f6"),
+            ("Excellent (85-100)", (df['performanceScore'] >= 85).sum(), "#10b981"),
+        ]
+        perf_dist = [
+            DistributionBucket(
+                name=label,
+                count=int(cnt),
+                percentage=round((cnt / total) * 100, 1) if total > 0 else 0.0,
+                color=color
+            )
+            for label, cnt, color in perf_bins
+        ]
+
+        # Attendance Distribution
+        att_bins = [
+            ("< 75% (Critical)", (df['attendancePercentage'] < 75).sum(), "#ef4444"),
+            ("75% - 84% (Warning)", ((df['attendancePercentage'] >= 75) & (df['attendancePercentage'] < 85)).sum(), "#f59e0b"),
+            ("85% - 94% (Good)", ((df['attendancePercentage'] >= 85) & (df['attendancePercentage'] < 95)).sum(), "#3b82f6"),
+            ("95% - 100% (Optimal)", (df['attendancePercentage'] >= 95).sum(), "#10b981")
+        ]
+        att_dist = [
+            DistributionBucket(
+                name=label,
+                count=int(cnt),
+                percentage=round((cnt / total) * 100, 1) if total > 0 else 0.0,
+                color=color
+            )
+            for label, cnt, color in att_bins
+        ]
+
+        # Category Ratios (EPI based)
+        cats = ['Excellent', 'Good', 'Average', 'Needs Improvement', 'Critical']
+        cat_colors = {'Excellent': '#10b981', 'Good': '#3b82f6', 'Average': '#eab308', 'Needs Improvement': '#f97316', 'Critical': '#ef4444'}
+        cat_ratios = []
+        for c in cats:
+            cnt = int((df['performanceCategory'] == c).sum())
+            cat_ratios.append(DistributionBucket(
+                name=c,
+                count=cnt,
+                percentage=round((cnt / total) * 100, 1) if total > 0 else 0.0,
+                color=cat_colors.get(c, '#64748b')
+            ))
+
+        # Risk Ratios
+        risks = ['Low', 'Medium', 'High', 'Critical']
+        risk_colors = {'Low': '#10b981', 'Medium': '#3b82f6', 'High': '#f97316', 'Critical': '#ef4444'}
+        risk_ratios = []
+        for r in risks:
+            cnt = int((df['riskLevel'] == r).sum())
+            risk_ratios.append(DistributionBucket(
+                name=r,
+                count=cnt,
+                percentage=round((cnt / total) * 100, 1) if total > 0 else 0.0,
+                color=risk_colors.get(r, '#64748b')
+            ))
+
+        # Department Comparisons
+        dept_comp = []
+        for dept, g in df.groupby('department'):
+            dept_comp.append({
+                "department": dept,
+                "headcount": int(len(g)),
+                "avgPerformance": round(float(g['performanceScore'].mean()), 1),
+                "avgProductivity": round(float(g['productivityScore'].mean()), 1),
+                "avgAttendance": round(float(g['attendancePercentage'].mean()), 1),
+                "avgTarget": round(float(g['targetCompletionRate'].mean()), 1),
+                "highPerformers": int((g['performanceScore'] >= 80).sum()),
+                "underperformers": int((g['performanceScore'] < 60).sum())
+            })
+
+        # Productivity vs Target Scatter Sample (first 50 for clean chart)
+        prod_vs_target = []
+        for _, row in df.head(50).iterrows():
+            prod_vs_target.append({
+                "employeeId": row['employeeId'],
+                "employeeName": row['employeeName'],
+                "department": row['department'],
+                "productivity": float(row['productivityScore']),
+                "targetAchievement": float(row['targetCompletionRate']),
+                "performance": float(row['performanceScore']),
+                "category": row['performanceCategory']
+            })
+
+        # Top 10 and Bottom 10
+        sorted_df = df.sort_values(by='performanceScore', ascending=False)
+        top10 = sorted_df.head(10)[[
+            'employeeId', 'employeeName', 'department', 'designation',
+            'performanceScore', 'productivityScore', 'attendancePercentage', 'epi'
+        ]].to_dict(orient='records')
+
+        bottom10 = sorted_df.tail(10).sort_values(by='performanceScore', ascending=True)[[
+            'employeeId', 'employeeName', 'department', 'designation',
+            'performanceScore', 'productivityScore', 'attendancePercentage', 'epi', 'riskLevel'
+        ]].to_dict(orient='records')
+
+        return DistributionsResponse(
+            performanceDistribution=perf_dist,
+            attendanceDistribution=att_dist,
+            categoryRatios=cat_ratios,
+            riskRatios=risk_ratios,
+            departmentComparisons=dept_comp,
+            productivityVsTarget=prod_vs_target,
+            top10Performers=top10,
+            bottom10Performers=bottom10
+        )
+
+    @classmethod
+    def benchmark_departments(cls, employees: List[EmployeeData]) -> List[DepartmentMetric]:
+        df = cls.to_dataframe(employees)
+        if df.empty:
+            return []
+
+        results = []
+        for dept, g in df.groupby('department'):
+            avg_perf = float(g['performanceScore'].mean())
+            avg_prod = float(g['productivityScore'].mean())
+            avg_att = float(g['attendancePercentage'].mean())
+            avg_target = float(g['targetCompletionRate'].mean())
+
+            # Multi-criteria ranking formula:
+            # Score = (40% * Performance) + (30% * Productivity) + (20% * Attendance) + (10% * TargetAchievement)
+            composite_score = (0.40 * avg_perf) + (0.30 * avg_prod) + (0.20 * avg_att) + (0.10 * avg_target)
+
+            managers = g['managerName'].dropna().unique()
+            mgr_str = managers[0] if len(managers) > 0 and managers[0] != "Unassigned" else "Department Head"
+
+            results.append({
+                "department": dept,
+                "headcount": int(len(g)),
+                "compositeScore": round(composite_score, 2),
+                "averagePerformance": round(avg_perf, 1),
+                "averageProductivity": round(avg_prod, 1),
+                "averageAttendance": round(avg_att, 1),
+                "averageTargetAchievement": round(avg_target, 1),
+                "highPerformers": int((g['performanceScore'] >= 80).sum()),
+                "underperformers": int((g['performanceScore'] < 60).sum()),
+                "manager": mgr_str
+            })
+
+        # Sort by composite score descending and assign rank
+        results.sort(key=lambda x: x['compositeScore'], reverse=True)
+        for i, item in enumerate(results):
+            item['rank'] = i + 1
+
+        return [DepartmentMetric(**r) for r in results]
+
+    @classmethod
+    def train_and_predict_performance(cls, peers: List[EmployeeData], target: EmployeeData) -> PredictionResponse:
+        """
+        Trains a multivariate Scikit-learn Linear Regression model on peers and
+        predicts expected performance for the target employee, assessing positive/negative delta.
+        """
+        all_emps = peers if peers else [target]
+        # Include target in peer set if not already present
+        if not any(e.employeeId == target.employeeId for e in all_emps):
+            all_emps = all_emps + [target]
+
+        df = cls.to_dataframe(all_emps)
+
+        feature_cols = [
+            'productivityScore', 'attendancePercentage', 'qualityScore',
+            'targetCompletionRate', 'experience', 'trainingHours'
+        ]
+
+        X = df[feature_cols].values
+        y = df['performanceScore'].values
+
+        # If we have at least 3 samples with variance, fit LinearRegression
+        if len(df) >= 3 and np.var(y) > 0.01:
+            model = LinearRegression()
+            model.fit(X, y)
+            r2 = float(np.clip(model.score(X, y), 0.1, 0.98))
+            coefficients = model.coef_
+        else:
+            # Fallback deterministic weights if small sample
+            r2 = 0.85
+            coefficients = np.array([0.45, 0.25, 0.20, 0.10, 0.5, 0.2])
+
+        target_features = np.array([[
+            float(target.productivityScore),
+            float(target.attendancePercentage),
+            float(target.qualityScore),
+            float(target.targetCompletionRate),
+            float(target.experience),
+            float(target.trainingHours)
+        ]])
+
+        if len(df) >= 3 and np.var(y) > 0.01:
+            predicted_raw = float(model.predict(target_features)[0])
+        else:
+            predicted_raw = float(
+                (0.35 * target.productivityScore) +
+                (0.25 * target.qualityScore) +
+                (0.20 * target.attendancePercentage) +
+                (0.15 * target.targetCompletionRate) +
+                (0.05 * min(100, target.experience * 10))
+            )
+
+        predicted = round(float(np.clip(predicted_raw, 0, 100)), 1)
+        actual = round(float(target.performanceScore), 1)
+        delta = round(actual - predicted, 1)
+
+        # Trend interpretation
+        if delta > 4.0:
+            trend = "Positive"
+            forecast_summary = f"{target.employeeName} is outperforming baseline regression expectations by +{delta} pts. High operational velocity and execution quality."
+        elif delta < -4.0:
+            trend = "Negative"
+            forecast_summary = f"{target.employeeName} is underperforming baseline regression expectations by {delta} pts. Suggests potential blockers or disengagement."
+        else:
+            trend = "Aligned"
+            forecast_summary = f"{target.employeeName}'s evaluated score closely aligns with multivariate peer performance models (delta: {delta:+0.1f} pts)."
+
+        feature_names = ["Productivity", "Attendance", "Quality", "Target Completion", "Experience", "Training"]
+        feature_importances = {}
+        for name, coef in zip(feature_names, coefficients):
+            feature_importances[name] = round(float(abs(coef)), 3)
+
+        # Key drivers
+        drivers = []
+        if target.productivityScore >= 85:
+            drivers.append("Exceptional daily productivity score")
+        elif target.productivityScore < 60:
+            drivers.append("Productivity deficit holding back performance")
+
+        if target.attendancePercentage >= 95:
+            drivers.append("Near-perfect workplace attendance")
+        elif target.attendancePercentage < 75:
+            drivers.append("Attendance below minimum organizational threshold")
+
+        if target.qualityScore >= 85:
+            drivers.append("High deliverable quality and low error rate")
+
+        if not drivers:
+            drivers.append("Balanced baseline across operational inputs")
+
+        # Target EPI
+        task_score = np.clip(target.tasksCompleted * 5.0, 0, 100) if target.tasksCompleted > 0 else target.targetCompletionRate
+        epi = round(
+            (0.30 * target.productivityScore) +
+            (0.25 * target.qualityScore) +
+            (0.20 * target.attendancePercentage) +
+            (0.15 * target.targetCompletionRate) +
+            (0.10 * task_score),
+            1
+        )
+
+        return PredictionResponse(
+            employeeId=target.employeeId,
+            employeeName=target.employeeName,
+            actualPerformance=actual,
+            predictedPerformance=predicted,
+            performanceDelta=delta,
+            trend=trend,
+            confidenceScore=round(r2, 2),
+            featureImportances=feature_importances,
+            expectedEPI=epi,
+            keyDrivers=drivers,
+            forecastSummary=forecast_summary
+        )
+
+    @classmethod
+    def assess_performance_risks(cls, employees: List[EmployeeData], thresholds: Optional[Dict[str, float]] = None) -> RiskAssessmentResponse:
+        df = cls.to_dataframe(employees)
+        if df.empty:
+            return RiskAssessmentResponse(
+                totalEvaluated=0,
+                criticalCount=0,
+                highCount=0,
+                mediumCount=0,
+                lowCount=0,
+                atRiskEmployees=[]
+            )
+
+        # Configurable thresholds
+        t_perf = thresholds.get('performance', 65.0) if thresholds else 65.0
+        t_att = thresholds.get('attendance', 75.0) if thresholds else 75.0
+        t_prod = thresholds.get('productivity', 65.0) if thresholds else 65.0
+        t_target = thresholds.get('target', 70.0) if thresholds else 70.0
+
+        at_risk_list = []
+        for _, row in df.iterrows():
+            perf = row['performanceScore']
+            att = row['attendancePercentage']
+            prod = row['productivityScore']
+            target = row['targetCompletionRate']
+            quality = row['qualityScore']
+            epi = row['epi']
+
+            risk_factors = []
+            suggested_actions = []
+
+            # Multi-factor penalty scoring (0 = safe, 100 = extreme risk)
+            penalty = 0.0
+
+            if perf < 50.0:
+                penalty += 35.0
+                risk_factors.append(f"Severely low performance rating ({perf:.1f}%)")
+            elif perf < t_perf:
+                penalty += 20.0
+                risk_factors.append(f"Sub-par performance score ({perf:.1f}%)")
+
+            if att < 70.0:
+                penalty += 30.0
+                risk_factors.append(f"Critical attendance deficit ({att:.1f}%)")
+                suggested_actions.append("Mandatory HR Attendance Counseling Session")
+            elif att < t_att:
+                penalty += 15.0
+                risk_factors.append(f"Attendance below threshold ({att:.1f}%)")
+                suggested_actions.append("Attendance verification and flex-schedule review")
+
+            if prod < 55.0:
+                penalty += 20.0
+                risk_factors.append(f"Sharp productivity drop ({prod:.1f}%)")
+                suggested_actions.append("Workload rebalancing & bottleneck assessment")
+            elif prod < t_prod:
+                penalty += 10.0
+                risk_factors.append(f"Productivity below expectation ({prod:.1f}%)")
+
+            if target < t_target:
+                penalty += 15.0
+                risk_factors.append(f"Low target achievement rate ({target:.1f}%)")
+                suggested_actions.append("1-on-1 KPI realignment with direct manager")
+
+            if quality < 65.0:
+                penalty += 15.0
+                risk_factors.append(f"Work quality & error rate concern ({quality:.1f}%)")
+                suggested_actions.append("Peer code/deliverable review and QA mentoring")
+
+            risk_score = round(min(100.0, penalty), 1)
+
+            # Categorize priority
+            if risk_score >= 60.0 or epi < 50.0:
+                priority = "Critical"
+                suggested_actions.insert(0, "Initiate Formal 30-Day Performance Improvement Plan (PIP)")
+            elif risk_score >= 40.0 or epi < 65.0:
+                priority = "High"
+                suggested_actions.insert(0, "Schedule Bi-weekly Manager Review & Technical Training")
+            elif risk_score >= 20.0 or epi < 75.0:
+                priority = "Medium"
+                suggested_actions.insert(0, "Informal 1-on-1 check-in with Team Lead")
+            else:
+                priority = "Low"
+                suggested_actions.append("Standard periodic review")
+
+            # Only include in at-risk list if medium, high or critical
+            if priority in ['Critical', 'High', 'Medium']:
+                at_risk_list.append(RiskAssessmentItem(
+                    employeeId=row['employeeId'],
+                    employeeName=row['employeeName'],
+                    department=row['department'],
+                    designation=row['designation'],
+                    managerName=row.get('managerName', 'Unassigned'),
+                    performanceScore=float(perf),
+                    productivityScore=float(prod),
+                    attendancePercentage=float(att),
+                    targetCompletionRate=float(target),
+                    qualityScore=float(quality),
+                    epi=float(epi),
+                    riskScore=risk_score,
+                    priority=priority,
+                    riskFactors=risk_factors if risk_factors else ["Minor metric fluctuations"],
+                    suggestedInterventions=suggested_actions[:3],
+                    contactEmail=row.get('email', f"{row['employeeId'].lower()}@workforce.io"),
+                    contactPhone=row.get('phone', '+1 (555) 019-2834')
+                ))
+
+        # Sort at_risk_list by risk score descending
+        at_risk_list.sort(key=lambda x: x.riskScore, reverse=True)
+
+        critical_c = sum(1 for x in at_risk_list if x.priority == 'Critical')
+        high_c = sum(1 for x in at_risk_list if x.priority == 'High')
+        med_c = sum(1 for x in at_risk_list if x.priority == 'Medium')
+        low_c = len(df) - len(at_risk_list)
+
+        return RiskAssessmentResponse(
+            totalEvaluated=len(df),
+            criticalCount=critical_c,
+            highCount=high_c,
+            mediumCount=med_c,
+            lowCount=max(0, low_c),
+            atRiskEmployees=at_risk_list
+        )
+
+    @classmethod
+    def employee_deep_dive(cls, employees: List[EmployeeData], employee_id: str) -> Optional[EmployeeDeepDiveResponse]:
+        df = cls.to_dataframe(employees)
+        if df.empty:
+            return None
+
+        match = df[df['employeeId'] == employee_id]
+        if match.empty:
+            return None
+
+        emp = match.iloc[0]
+        emp_obj = next(e for e in employees if e.employeeId == employee_id)
+
+        # Calculate Percentiles
+        workforce_rank = (df['performanceScore'] < emp['performanceScore']).sum()
+        workforce_pct = round((workforce_rank / max(1, len(df) - 1)) * 100, 1)
+
+        dept_df = df[df['department'] == emp['department']]
+        dept_rank = (dept_df['performanceScore'] < emp['performanceScore']).sum()
+        dept_pct = round((dept_rank / max(1, len(dept_df) - 1)) * 100, 1) if len(dept_df) > 1 else 100.0
+
+        # Radar chart metrics (all 0-100)
+        radar_scores = {
+            "Productivity": float(emp['productivityScore']),
+            "Quality": float(emp['qualityScore']),
+            "Attendance": float(emp['attendancePercentage']),
+            "TargetAchievement": float(emp['targetCompletionRate']),
+            "TaskCompletion": float(emp['taskCompletionScore'])
+        }
+
+        # Strengths & Weaknesses
         strengths = []
         weaknesses = []
         recommendations = []
 
-        # Attendance analysis
-        if student.attendancePercentage >= 90:
-            strengths.append('Excellent attendance record')
-        elif student.attendancePercentage >= 75:
-            strengths.append('Adequate attendance')
-        else:
-            weaknesses.append(f'Low attendance ({student.attendancePercentage}%)')
-            recommendations.append(f'Improve attendance — currently at {student.attendancePercentage}%, target 75%+')
+        if emp['productivityScore'] >= 80:
+            strengths.append(f"Strong productivity rate ({emp['productivityScore']:.1f}%)")
+        elif emp['productivityScore'] < 65:
+            weaknesses.append(f"Productivity output ({emp['productivityScore']:.1f}%) is below department average")
+            recommendations.append("Audit sprint tasks to eliminate blockers and redundant meetings.")
 
-        # GPA analysis
-        if student.gpa >= 8.5:
-            strengths.append(f'Outstanding GPA ({student.gpa})')
-        elif student.gpa >= 7.5:
-            strengths.append(f'Strong GPA ({student.gpa})')
-        elif student.gpa < 5.5:
-            weaknesses.append(f'Below-average GPA ({student.gpa})')
-            recommendations.append('Focus on core concepts and fundamentals to improve GPA')
+        if emp['qualityScore'] >= 85:
+            strengths.append(f"Superb deliverable quality ({emp['qualityScore']:.1f}%) with minimal rework")
+        elif emp['qualityScore'] < 70:
+            weaknesses.append(f"Quality review score ({emp['qualityScore']:.1f}%) suggests recurring defect rate")
+            recommendations.append("Pair with senior engineer/specialist for code reviews & QA check-lists.")
 
-        # Subject analysis
-        if strong_subjects:
-            strengths.append(f'Excellent performance in {", ".join(strong_subjects)}')
-        if weak_subjects:
-            weaknesses.append(f'Needs improvement in {", ".join(weak_subjects)}')
-            recommendations.append(f'Seek tutoring or extra practice in {", ".join(weak_subjects)}')
+        if emp['attendancePercentage'] >= 95:
+            strengths.append(f"Reliable commitment with {emp['attendancePercentage']:.1f}% attendance")
+        elif emp['attendancePercentage'] < 80:
+            weaknesses.append(f"Attendance deficit at {emp['attendancePercentage']:.1f}%")
+            recommendations.append("Conduct an empathetic 1-on-1 to discuss workplace schedule and support.")
 
-        # Internal marks
-        if student.internalMarks >= 40:
-            strengths.append('Strong internal assessment scores')
-        elif student.internalMarks < 20:
-            weaknesses.append('Low internal marks')
-            recommendations.append('Improve preparation for internal assessments')
+        if emp['targetCompletionRate'] >= 85:
+            strengths.append(f"High target completion rate ({emp['targetCompletionRate']:.1f}%)")
+        elif emp['targetCompletionRate'] < 70:
+            weaknesses.append(f"Target completion lagging at {emp['targetCompletionRate']:.1f}%")
+            recommendations.append("Break quarterly milestones into weekly actionable sprints.")
 
-        # General recommendations
+        if not strengths:
+            strengths.append("Consistent contributor across standard baseline responsibilities")
+        if not weaknesses:
+            weaknesses.append("No critical weaknesses detected in current evaluation cycle")
         if not recommendations:
-            recommendations.append('Maintain current performance level')
-            if student.gpa < 9.0:
-                recommendations.append('Aim for higher GPA in upcoming semester')
+            recommendations.append("Continue current trajectory; explore stretch assignments and mentorship roles.")
 
-        return {
-            'usn': student.usn,
-            'studentName': student.studentName,
-            'performance_class': performance,
-            'strengths': strengths,
-            'weaknesses': weaknesses,
-            'recommendations': recommendations
+        peer_comp = {
+            "departmentAvgPerformance": round(float(dept_df['performanceScore'].mean()), 1),
+            "departmentAvgProductivity": round(float(dept_df['productivityScore'].mean()), 1),
+            "companyAvgPerformance": round(float(df['performanceScore'].mean()), 1),
+            "companyAvgProductivity": round(float(df['productivityScore'].mean()), 1)
         }
 
-    @staticmethod
-    def calculate_correlation_with_interpretation(students: List[StudentData]) -> Dict:
-        """Calculate Pearson correlation between attendance and GPA with full interpretation."""
-        df = AnalyticsEngine.create_dataframe(students)
-
-        corr = df['attendancePercentage'].corr(df['gpa'])
-        if np.isnan(corr):
-            corr = 0.0
-
-        abs_corr = abs(corr)
-        if abs_corr >= 0.7:
-            strength = "Strong"
-        elif abs_corr >= 0.4:
-            strength = "Moderate"
-        elif abs_corr >= 0.2:
-            strength = "Weak"
-        else:
-            strength = "Very Weak"
-
-        direction = "Positive" if corr > 0 else "Negative"
-
-        if corr > 0.4:
-            interpretation = "Students with better attendance tend to achieve significantly higher GPAs."
-        elif corr > 0.2:
-            interpretation = "There is a noticeable trend of higher GPAs among students with better attendance."
-        elif corr > 0:
-            interpretation = "Attendance has a slight positive influence on GPA, but other factors play a larger role."
-        elif corr < -0.2:
-            interpretation = "Unusually, attendance shows a negative relationship with GPA — this may indicate data quality issues."
-        else:
-            interpretation = "Attendance and GPA show minimal linear relationship in this dataset."
-
-        return {
-            'coefficient': round(float(corr), 4),
-            'strength': strength,
-            'direction': direction,
-            'label': f"{strength} {direction} Correlation",
-            'interpretation': interpretation
-        }
+        return EmployeeDeepDiveResponse(
+            employee=emp_obj,
+            calculatedEPI=float(emp['epi']),
+            category=str(emp['performanceCategory']),
+            riskPriority=str(emp['riskLevel']),
+            radarScores=radar_scores,
+            departmentPercentile=dept_pct,
+            workforcePercentile=workforce_pct,
+            strengths=strengths,
+            weaknesses=weaknesses,
+            actionableRecommendations=recommendations,
+            peerComparison=peer_comp
+        )

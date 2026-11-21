@@ -1,323 +1,253 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { toast } from 'react-toastify';
-import { Download, BarChart3, Award, ShieldAlert, Briefcase, Users, ChevronDown } from 'lucide-react';
-import { exportAPI, analyticsAPI } from '../services/api';
-
-// Format Dropdown Button Component
-function DownloadButton({ formats, onDownload, disabled }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  // Close on outside click
-  useEffect(() => {
-    const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
-  // If only one format, download directly
-  if (formats.length === 1) {
-    return (
-      <button
-        onClick={() => onDownload(formats[0].key)}
-        disabled={disabled}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:opacity-50 transition-colors font-semibold text-sm"
-      >
-        <Download size={16} />
-        Download {formats[0].label}
-      </button>
-    );
-  }
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        disabled={disabled}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:opacity-50 transition-colors font-semibold text-sm"
-      >
-        <Download size={16} />
-        {disabled ? 'Downloading...' : 'Download'}
-        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-20"
-        >
-          {formats.map((fmt) => (
-            <button
-              key={fmt.key}
-              onClick={() => { setOpen(false); onDownload(fmt.key); }}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
-            >
-              <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-                fmt.key === 'excel' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-              }`}>
-                {fmt.key === 'excel' ? 'XLS' : 'PDF'}
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-slate-800">{fmt.label}</p>
-                <p className="text-[10px] text-slate-400">{fmt.desc}</p>
-              </div>
-            </button>
-          ))}
-        </motion.div>
-      )}
-    </div>
-  );
-}
+import {
+  FileSpreadsheet,
+  FileText,
+  Download,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  Users,
+  ShieldAlert,
+  Star,
+  RefreshCw,
+  FileCheck
+} from 'lucide-react';
+import { exportAPI, employeeAPI } from '../services/api';
 
 export default function Reports() {
-  const [exporting, setExporting] = useState(false);
-  const [department, setDepartment] = useState('');
-  const [departments, setDepartments] = useState([]);
-  const [topCount, setTopCount] = useState(10);
+  const [downloading, setDownloading] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [selectedEmpId, setSelectedEmpId] = useState('');
 
   useEffect(() => {
-    fetchDepartments();
+    employeeAPI.getAll({ limit: 100, sortBy: 'employeeName', sortOrder: 'asc' })
+      .then((res) => {
+        if (res.data?.success && res.data.data.length > 0) {
+          setEmployees(res.data.data);
+          setSelectedEmpId(res.data.data[0].employeeId);
+        }
+      })
+      .catch(console.error);
   }, []);
 
-  const fetchDepartments = async () => {
+  const triggerDownload = async (key, apiCall, filename) => {
     try {
-      const res = await analyticsAPI.getDepartmentComparison();
-      const deptList = (res.data?.data || []).map(d => d._id);
-      setDepartments(deptList);
-    } catch (e) {
-      // silent fail
-    }
-  };
-
-  const downloadFile = async (apiCall, filename) => {
-    try {
-      setExporting(true);
-      const response = await apiCall;
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      setDownloading(key);
+      const res = await apiCall();
+      const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
-      link.parentElement.removeChild(link);
-      toast.success('Report downloaded successfully');
-    } catch (error) {
-      toast.error('Failed to export report');
-      console.error(error);
+      link.remove();
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Failed to generate report. Please try again.');
     } finally {
-      setExporting(false);
+      setDownloading(null);
     }
   };
 
-  const reportCards = [
+  const excelReports = [
     {
-      title: 'All Students Report',
-      description: 'Complete student data with all academic details, marks, attendance, and GPA scores',
-      icon: BarChart3,
-      color: 'from-blue-400 to-blue-600',
-      formats: [
-        { key: 'excel', label: 'Excel (.xlsx)', desc: 'Editable spreadsheet format' },
-        { key: 'pdf', label: 'PDF Document', desc: 'Professional print-ready format' },
-      ],
-      onDownload: (fmt) => {
-        if (fmt === 'excel') downloadFile(exportAPI.exportAllStudentsExcel({ department }), 'all_students.xlsx');
-        else downloadFile(exportAPI.exportAllStudentsPDF({ department }), 'all_students.pdf');
-      }
-    },
-    {
-      title: 'Detained Students Report',
-      description: 'Students with attendance below 75% requiring immediate academic intervention',
-      icon: ShieldAlert,
-      color: 'from-red-400 to-red-600',
-      formats: [
-        { key: 'excel', label: 'Excel (.xlsx)', desc: 'Editable spreadsheet format' },
-        { key: 'pdf', label: 'PDF Document', desc: 'Professional print-ready format' },
-      ],
-      onDownload: (fmt) => {
-        if (fmt === 'excel') downloadFile(exportAPI.exportDetainedExcel({ department }), 'detained_students.xlsx');
-        else downloadFile(exportAPI.exportDetainedPDF({ department }), 'detained_students.pdf');
-      }
-    },
-    {
-      title: 'Department Analytics',
-      description: 'Performance stats per department with weighted rankings, pass rates, and top students',
+      id: 'full-db',
+      title: 'Complete Workforce Database',
+      description: 'Comprehensive roster containing all employee attributes, contact details, operational scores, and EPI ratings.',
       icon: Users,
-      color: 'from-purple-400 to-purple-600',
-      formats: [
-        { key: 'excel', label: 'Excel (.xlsx)', desc: 'Editable spreadsheet format' },
-        { key: 'pdf', label: 'PDF Document', desc: 'Professional print-ready format' },
-      ],
-      onDownload: (fmt) => {
-        if (fmt === 'excel') downloadFile(exportAPI.exportDepartmentReportExcel({ department }), 'department_report.xlsx');
-        else downloadFile(exportAPI.exportDepartmentReportPDF({ department }), 'department_report.pdf');
-      }
+      action: () => triggerDownload('full-db', exportAPI.exportFullDatabaseExcel, 'workforce_full_database.xlsx')
     },
     {
-      title: `Top ${topCount} Performers`,
-      description: `Top ${topCount} students ranked by GPA with attendance and internal marks breakdown`,
-      icon: Award,
-      color: 'from-emerald-400 to-emerald-600',
-      formats: [
-        { key: 'excel', label: 'Excel (.xlsx)', desc: 'Editable spreadsheet format' },
-      ],
-      onDownload: () => downloadFile(exportAPI.exportTopPerformersExcel({ department, limit: topCount }), `top_${topCount}_performers.xlsx`)
+      id: 'perf-summary',
+      title: 'Performance & EPI Rating Summary',
+      description: 'Executive spreadsheet ranking all personnel by evaluated performance and composite Employee Performance Index.',
+      icon: Star,
+      action: () => triggerDownload('perf-summary', exportAPI.exportPerformanceSummaryExcel, 'performance_summary.xlsx')
     },
     {
-      title: 'Academic Risk Report',
-      description: 'Students at academic risk with risk scores, severity levels, and contributing factors',
+      id: 'underperforming',
+      title: 'Underperformance & Risk Assessment',
+      description: 'Audit report of employees categorized under Critical, High, or Medium risk with penalty drivers and suggested interventions.',
       icon: ShieldAlert,
-      color: 'from-orange-400 to-orange-600',
-      formats: [
-        { key: 'excel', label: 'Excel (.xlsx)', desc: 'Editable spreadsheet format' },
-        { key: 'pdf', label: 'PDF Document', desc: 'Professional print-ready format' },
-      ],
-      onDownload: (fmt) => {
-        if (fmt === 'excel') downloadFile(exportAPI.exportRiskReportExcel({ department }), 'risk_report.xlsx');
-        else downloadFile(exportAPI.exportRiskReportPDF({ department }), 'risk_report.pdf');
-      }
+      action: () => triggerDownload('underperforming', exportAPI.exportUnderperformingExcel, 'underperformance_risk_report.xlsx')
     },
     {
-      title: 'Executive Summary',
-      description: 'Comprehensive HOD/Principal report with key statistics, department rankings, and overall health',
-      icon: Briefcase,
-      color: 'from-slate-700 to-slate-900',
-      formats: [
-        { key: 'pdf', label: 'PDF Document', desc: 'Professional executive brief' },
-      ],
-      onDownload: () => downloadFile(exportAPI.exportExecutiveSummaryPDF({ department }), 'executive_summary.pdf')
+      id: 'dept-benchmark',
+      title: 'Departmental Benchmark & Rankings',
+      description: 'Multi-criteria ranking summary of departments based on the 40/30/20/10 weighted formula with headcount and averages.',
+      icon: Building2,
+      action: () => triggerDownload('dept-benchmark', exportAPI.exportDepartmentBenchmarksExcel, 'department_benchmarks.xlsx')
     },
+    {
+      id: 'high-performers',
+      title: 'High-Performing Talent Pool',
+      description: 'Filtered list of top talent maintaining performance scores ≥ 80% for promotion and leadership pipelines.',
+      icon: FileCheck,
+      action: () => triggerDownload('high-performers', exportAPI.exportHighPerformersExcel, 'high_performers_pool.xlsx')
+    }
+  ];
+
+  const pdfReports = [
+    {
+      id: 'exec-pdf',
+      title: 'Executive Workforce Performance Report (PDF)',
+      description: 'Formal corporate brief with executive KPI cards, top departmental benchmarks, leaderboards, and HR review sign-off block.',
+      action: () => triggerDownload('exec-pdf', exportAPI.exportExecutiveWorkforcePDF, 'executive_workforce_report.pdf')
+    },
+    {
+      id: 'risk-pdf',
+      title: 'Workforce Risk & PIP Intervention Report (PDF)',
+      description: 'Formal HR audit documentation itemizing at-risk employees, attendance deficits, and recommended 30-day PIP action plans.',
+      action: () => triggerDownload('risk-pdf', exportAPI.exportPerformanceRiskPDF, 'workforce_risk_intervention_report.pdf')
+    }
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-lg shadow-lg p-8 text-white"
-      >
-        <h1 className="text-3xl font-bold mb-2">Reports & Export</h1>
-        <p className="text-slate-300">Generate and download comprehensive reports about student performance and academic status</p>
-      </motion.div>
-
-      {/* Filters */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-lg shadow-lg p-6"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-semibold text-navy mb-3">
-              Filter by Department
-            </label>
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="">All Departments</option>
-              {departments.map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-navy mb-3">
-              Top Performers Count
-            </label>
-            <select
-              value={topCount}
-              onChange={(e) => setTopCount(parseInt(e.target.value))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value={10}>Top 10</option>
-              <option value={20}>Top 20</option>
-              <option value={50}>Top 50</option>
-            </select>
-          </div>
+      {/* ─── Page Header ──────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+            <span>Export & Reporting Documentation Center</span>
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Generate publication-ready styled Microsoft Excel spreadsheets and formal organizational PDF reports
+          </p>
         </div>
-      </motion.div>
-
-      {/* Reports Grid — Consolidated Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {reportCards.map((report, index) => {
-          const Icon = report.icon;
-          return (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              whileHover={{ y: -5 }}
-              className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all flex flex-col"
-            >
-              <div className={`bg-gradient-to-br ${report.color} h-28 flex items-center justify-center text-white rounded-t-xl`}>
-                <Icon size={40} opacity={0.8} />
-              </div>
-
-              <div className="p-5 flex flex-col flex-1">
-                <h3 className="text-base font-bold text-navy mb-1.5">{report.title}</h3>
-                <p className="text-gray-500 text-xs mb-4 leading-relaxed flex-1">{report.description}</p>
-
-                {/* Format badges */}
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-                  <span className="text-[10px] font-semibold text-gray-400 uppercase">Available:</span>
-                  {report.formats.map(fmt => (
-                    <span key={fmt.key} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      fmt.key === 'excel' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'
-                    }`}>
-                      {fmt.key === 'excel' ? '.xlsx' : '.pdf'}
-                    </span>
-                  ))}
-                </div>
-
-                <DownloadButton
-                  formats={report.formats}
-                  onDownload={report.onDownload}
-                  disabled={exporting}
-                />
-              </div>
-            </motion.div>
-          );
-        })}
       </div>
 
-      {/* Help Section */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="grid grid-cols-1 md:grid-cols-2 gap-6"
-      >
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
-          <h4 className="font-bold text-emerald-900 mb-3">✓ What's Included in Reports</h4>
-          <ul className="space-y-2 text-sm text-emerald-900">
-            <li>✓ Complete student information</li>
-            <li>✓ Subject-wise marks</li>
-            <li>✓ Attendance percentage</li>
-            <li>✓ GPA/CGPA scores</li>
-            <li>✓ Detention status</li>
-            <li>✓ Risk scores & recommendations</li>
-            <li>✓ Department-wise analytics</li>
-          </ul>
+      {/* ─── Excel Reports Section ────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+            Formatted Microsoft Excel (.xlsx) Reports
+          </h2>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h4 className="font-bold text-blue-900 mb-3">💡 Tips for Using Reports</h4>
-          <ul className="space-y-2 text-sm text-blue-900">
-            <li>• Use Excel for data analysis & editing</li>
-            <li>• Use PDF for official documentation</li>
-            <li>• Filter by department for specific reports</li>
-            <li>• Executive Summary is ideal for HOD/Principal</li>
-            <li>• Risk Report for academic counseling teams</li>
-          </ul>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {excelReports.map((rpt) => {
+            const Icon = rpt.icon;
+            const isBusy = downloading === rpt.id;
+            return (
+              <div
+                key={rpt.id}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+              >
+                <div className="space-y-2">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 flex items-center justify-center">
+                    <Icon size={18} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {rpt.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    {rpt.description}
+                  </p>
+                </div>
+
+                <button
+                  onClick={rpt.action}
+                  disabled={isBusy}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <Download size={14} className={isBusy ? 'animate-bounce' : ''} />
+                  <span>{isBusy ? 'Generating Spreadsheet...' : 'Download .xlsx'}</span>
+                </button>
+              </div>
+            );
+          })}
         </div>
-      </motion.div>
+      </div>
+
+      {/* ─── PDF Reports Section ──────────────────────────────────────────── */}
+      <div className="space-y-4 pt-2">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-indigo-600" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+            Formal PDF Documentation (PDFKit Engine)
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {pdfReports.map((rpt) => {
+            const isBusy = downloading === rpt.id;
+            return (
+              <div
+                key={rpt.id}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4"
+              >
+                <div className="space-y-2">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/60 flex items-center justify-center">
+                    <FileText size={18} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {rpt.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    {rpt.description}
+                  </p>
+                </div>
+
+                <button
+                  onClick={rpt.action}
+                  disabled={isBusy}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <Download size={14} className={isBusy ? 'animate-bounce' : ''} />
+                  <span>{isBusy ? 'Compiling PDF...' : 'Download Formal PDF'}</span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Individual Employee Appraisal PDF Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <FileText className="w-4 h-4 text-purple-600" />
+              <span>Individual Performance Appraisal Document (PDF)</span>
+            </h3>
+            <p className="text-xs text-slate-500">
+              Generates an appraisal dossier with performance breakdown, manager evaluation, and sign-off blocks
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedEmpId}
+              onChange={(e) => setSelectedEmpId(e.target.value)}
+              className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-hidden"
+            >
+              {employees.map((e) => (
+                <option key={e.employeeId} value={e.employeeId}>
+                  {e.employeeName} ({e.employeeId})
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => {
+                if (selectedEmpId) {
+                  triggerDownload(
+                    `emp-${selectedEmpId}`,
+                    () => exportAPI.exportEmployeeAppraisalPDF(selectedEmpId),
+                    `appraisal_${selectedEmpId}.pdf`
+                  );
+                }
+              }}
+              disabled={!selectedEmpId || downloading === `emp-${selectedEmpId}`}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shrink-0 disabled:opacity-50 cursor-pointer"
+            >
+              <Download size={14} />
+              <span>Export Appraisal</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

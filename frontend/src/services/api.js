@@ -7,7 +7,7 @@ const api = axios.create({
   timeout: 30000,
 });
 
-// Auth interceptor — attach JWT token to every request
+// Request interceptor: inject JWT
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -16,12 +16,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor — redirect to login on 401
+// Response interceptor: handle 401
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
@@ -30,76 +31,77 @@ api.interceptors.response.use(
   }
 );
 
-// Students API
-export const studentAPI = {
-  getAll: (params) => api.get('/students', { params }),
-  getById: (usn) => api.get(`/students/${usn}`),
-  create: (data) => api.post('/students', data),
-  update: (usn, data) => api.put(`/students/${usn}`, data),
-  delete: (usn) => api.delete(`/students/${usn}`),
-  getDetained: () => api.get('/students/detained/list'),
-  search: (searchData) => api.post('/students/search', searchData),
+// ─── Auth API ────────────────────────────────────────────────────────────────
+export const authAPI = {
+  login: (credentials) => api.post('/auth/login', credentials),
+  register: (userData) => api.post('/auth/register', userData),
+  getProfile: () => api.get('/auth/me'),
 };
 
-// Upload API
+// ─── Employees API ───────────────────────────────────────────────────────────
+export const employeeAPI = {
+  getAll: (params) => api.get('/employees', { params }),
+  getById: (employeeId) => api.get(`/employees/${employeeId}`),
+  create: (data) => api.post('/employees', data),
+  update: (employeeId, data) => api.put(`/employees/${employeeId}`, data),
+  delete: (employeeId) => api.delete(`/employees/${employeeId}`),
+  getRisksList: () => api.get('/employees/risks/list'),
+  logIntervention: (employeeId, interventionData) =>
+    api.post(`/employees/${employeeId}/interventions`, interventionData),
+};
+
+// Compatibility alias
+export const studentAPI = employeeAPI;
+
+// ─── Upload API ──────────────────────────────────────────────────────────────
 export const uploadAPI = {
-  uploadFile: (file, clearExisting = false) => {
+  uploadFile: (file, mode = 'append') => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('clearExisting', clearExisting);
+    formData.append('mode', mode);
     return api.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  deleteAll: () => api.delete('/upload/all/data'),
-  downloadTemplate: () => api.get('/upload/template', { responseType: 'blob' }),
-  validate: (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post('/upload/validate', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
+  downloadExcelTemplate: () =>
+    api.get('/upload/template/excel', { responseType: 'blob' }),
+  downloadCsvTemplate: () =>
+    api.get('/upload/template/csv', { responseType: 'blob' }),
 };
 
-// Analytics API
+// ─── Analytics & ML API ───────────────────────────────────────────────────────
 export const analyticsAPI = {
   getKPI: (params) => api.get('/analytics/kpi', { params }),
-  getAttendanceDistribution: (params) => api.get('/analytics/attendance-distribution', { params }),
-  getSubjectPerformance: (params) => api.get('/analytics/subject-performance', { params }),
-  getGPADistribution: (params) => api.get('/analytics/gpa-distribution', { params }),
-  getDepartmentComparison: () => api.get('/analytics/department-comparison'),
-  getSemesterComparison: (params) => api.get('/analytics/semester-comparison', { params }),
-  getTopPerformers: (params) => api.get('/analytics/top-performers', { params }),
-  getWeakPerformers: (params) => api.get('/analytics/weak-performers', { params }),
-  getDetainedAnalysis: (params) => api.get('/analytics/detained-analysis', { params }),
-  getRiskStudents: (params) => api.get('/analytics/risk-students', { params }),
-};
-
-// ─── NEW: Insights & ML API ───────────────────────────────────────────────────
-export const insightsAPI = {
   getInsights: (params) => api.get('/analytics/insights', { params }),
-  getCorrelation: (params) => api.get('/analytics/correlation', { params }),
-  getRiskScores: (params) => api.get('/analytics/risk-scores', { params }),
-  getAcademicHealth: (params) => api.get('/analytics/academic-health', { params }),
-  getGPAPrediction: (params) => api.get('/analytics/gpa-prediction', { params }),
-  getDepartmentRanking: () => api.get('/analytics/department-ranking'),
-  getDetentionPriority: (params) => api.get('/analytics/detention-priority', { params }),
-  getStudentRecommendations: (usn) => api.get(`/analytics/student-recommendations/${usn}`),
+  getDistributions: (params) => api.get('/analytics/distributions', { params }),
+  getDepartments: (params) => api.get('/analytics/departments', { params }),
+  getPrediction: (employeeId) => api.get(`/analytics/predict/${employeeId}`),
+  getDeepDive: (employeeId) => api.get(`/analytics/deep-dive/${employeeId}`),
+  getRisks: (params) => api.get('/analytics/risks', { params }),
+  getHealth: () => api.get('/analytics/analytics-health'),
 };
 
-// Export API
+// ─── Export API ──────────────────────────────────────────────────────────────
 export const exportAPI = {
-  exportDetainedExcel: (params) => api.get('/export/detained-excel', { params, responseType: 'blob' }),
-  exportDetainedPDF: (params) => api.get('/export/detained-pdf', { params, responseType: 'blob' }),
-  exportAllStudentsExcel: (params) => api.get('/export/all-students-excel', { params, responseType: 'blob' }),
-  exportAllStudentsPDF: (params) => api.get('/export/all-students-pdf', { params, responseType: 'blob' }),
-  exportDepartmentReportExcel: (params) => api.get('/export/department-report-excel', { params, responseType: 'blob' }),
-  exportDepartmentReportPDF: (params) => api.get('/export/department-report-pdf', { params, responseType: 'blob' }),
-  exportTopPerformersExcel: (params) => api.get('/export/top-performers-excel', { params, responseType: 'blob' }),
-  exportRiskReportExcel: (params) => api.get('/export/risk-report-excel', { params, responseType: 'blob' }),
-  exportRiskReportPDF: (params) => api.get('/export/risk-report-pdf', { params, responseType: 'blob' }),
-  exportExecutiveSummaryPDF: (params) => api.get('/export/executive-summary-pdf', { params, responseType: 'blob' }),
+  // Excel
+  exportFullDatabaseExcel: () =>
+    api.get('/export/excel/full-database', { responseType: 'blob' }),
+  exportPerformanceSummaryExcel: () =>
+    api.get('/export/excel/performance-summary', { responseType: 'blob' }),
+  exportUnderperformingExcel: () =>
+    api.get('/export/excel/underperforming', { responseType: 'blob' }),
+  exportDepartmentBenchmarksExcel: () =>
+    api.get('/export/excel/departmental-benchmark', { responseType: 'blob' }),
+  exportHighPerformersExcel: () =>
+    api.get('/export/excel/high-performers', { responseType: 'blob' }),
+
+  // PDF
+  exportExecutiveWorkforcePDF: () =>
+    api.get('/export/pdf/executive-workforce', { responseType: 'blob' }),
+  exportEmployeeAppraisalPDF: (employeeId) =>
+    api.get(`/export/pdf/employee/${employeeId}`, { responseType: 'blob' }),
+  exportPerformanceRiskPDF: () =>
+    api.get('/export/pdf/performance-risk', { responseType: 'blob' }),
 };
 
 export default api;

@@ -1,87 +1,156 @@
-from pydantic import BaseModel
-from typing import List, Optional, Dict
-from datetime import datetime
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
 
-class StudentData(BaseModel):
-    """Student data model"""
-    usn: str
-    studentName: str
+class EmployeeData(BaseModel):
+    """Core Employee Data Schema matching MongoDB model and CSV/Excel uploads"""
+    employeeId: str
+    employeeName: str
     department: str
-    semester: int
-    section: str
+    designation: str
+    experience: float
     attendancePercentage: float
-    subject1Marks: float = 0
-    subject2Marks: float = 0
-    subject3Marks: float = 0
-    subject4Marks: float = 0
-    subject5Marks: float = 0
-    internalMarks: float = 0
-    gpa: float = 0
-    cgpa: float = 0
+    performanceScore: float
+    productivityScore: float
+    qualityScore: float = 80.0
+    targetCompletionRate: float = 85.0
+    projectsCompleted: int = 0
+    tasksCompleted: int = 0
+    salary: float = 0.0
+    joiningDate: Optional[str] = None
+    managerName: Optional[str] = "Unassigned"
+    skills: Optional[List[str]] = []
+    trainingHours: float = 0.0
     email: Optional[str] = None
     phone: Optional[str] = None
+    status: Optional[str] = "Active"
+    epi: Optional[float] = None
+    performanceCategory: Optional[str] = None
+    riskLevel: Optional[str] = None
 
-class PerformanceAnalysis(BaseModel):
-    """Performance analysis result"""
-    usn: str
-    studentName: str
-    overall_performance: str
-    gpa: float
-    attendance: float
-    average_marks: float
-    weak_subjects: List[str]
-    strong_subjects: List[str]
-    risk_level: str
+class BatchEmployeeRequest(BaseModel):
+    """Request payload containing employee records"""
+    employees: List[EmployeeData]
+    thresholds: Optional[Dict[str, float]] = None
 
-class DetainedStudent(BaseModel):
-    """Detained student model"""
-    usn: str
-    studentName: str
+class SingleEmployeeAnalysisRequest(BaseModel):
+    """Request payload for single employee analysis alongside workforce peers"""
+    employee: EmployeeData
+    peers: Optional[List[EmployeeData]] = []
+
+class KPISummary(BaseModel):
+    """Executive KPI summary"""
+    totalEmployees: int
+    averagePerformance: float
+    averageAttendance: float
+    averageProductivity: float
+    averageTargetAchievement: float
+    averageQualityScore: float
+    highPerformersCount: int
+    underperformingCount: int
+    criticalRiskCount: int
+    totalProjectsCompleted: int
+    totalTrainingHours: float
+
+class DepartmentMetric(BaseModel):
+    """Department benchmark metric item"""
     department: str
-    semester: int
-    section: str
+    headcount: int
+    compositeScore: float
+    rank: int
+    averagePerformance: float
+    averageProductivity: float
+    averageAttendance: float
+    averageTargetAchievement: float
+    highPerformers: int
+    underperformers: int
+    manager: Optional[str] = "Various"
+
+class InsightItem(BaseModel):
+    """Structured insight item"""
+    id: str
+    type: str  # 'correlation', 'top_department', 'risk_alert', 'productivity_drop', 'opportunity'
+    title: str
+    description: str
+    severity: str  # 'info', 'success', 'warning', 'danger'
+    metricValue: Optional[float] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+class StatisticalInsightsResponse(BaseModel):
+    """Comprehensive statistical insights"""
+    correlationAttendancePerformance: float
+    correlationProductivityPerformance: float
+    attendancePValue: float
+    productivityPValue: float
+    bestDepartment: Dict[str, Any]
+    lowestDepartment: Dict[str, Any]
+    productivityDropDepartments: List[Dict[str, Any]]
+    insights: List[InsightItem]
+
+class DistributionBucket(BaseModel):
+    name: str
+    count: int
+    percentage: float
+    color: Optional[str] = None
+
+class DistributionsResponse(BaseModel):
+    performanceDistribution: List[DistributionBucket]
+    attendanceDistribution: List[DistributionBucket]
+    categoryRatios: List[DistributionBucket]
+    riskRatios: List[DistributionBucket]
+    departmentComparisons: List[Dict[str, Any]]
+    productivityVsTarget: List[Dict[str, Any]]
+    top10Performers: List[Dict[str, Any]]
+    bottom10Performers: List[Dict[str, Any]]
+
+class PredictionResponse(BaseModel):
+    employeeId: str
+    employeeName: str
+    actualPerformance: float
+    predictedPerformance: float
+    performanceDelta: float
+    trend: str  # 'Positive', 'Negative', 'Aligned'
+    confidenceScore: float  # R2 or model confidence
+    featureImportances: Dict[str, float]
+    expectedEPI: float
+    keyDrivers: List[str]
+    forecastSummary: str
+
+class RiskAssessmentItem(BaseModel):
+    employeeId: str
+    employeeName: str
+    department: str
+    designation: str
+    managerName: Optional[str]
+    performanceScore: float
+    productivityScore: float
     attendancePercentage: float
-    gpa: float
-    detentionReason: str
-    riskLevel: str
-    counselorRecommendation: str
+    targetCompletionRate: float
+    qualityScore: float
+    epi: float
+    riskScore: float  # 0-100
+    priority: str  # 'Critical', 'High', 'Medium', 'Low'
+    riskFactors: List[str]
+    suggestedInterventions: List[str]
+    contactEmail: Optional[str]
+    contactPhone: Optional[str]
 
-class AttendanceAnalysis(BaseModel):
-    """Attendance analysis model"""
-    studentId: str
-    totalClasses: int
-    attended: int
-    attendancePercentage: float
-    status: str
-    riskLevel: str
+class RiskAssessmentResponse(BaseModel):
+    totalEvaluated: int
+    criticalCount: int
+    highCount: int
+    mediumCount: int
+    lowCount: int
+    atRiskEmployees: List[RiskAssessmentItem]
 
-class StatisticalAnalysis(BaseModel):
-    """Statistical analysis results"""
-    mean_gpa: float
-    median_gpa: float
-    std_gpa: float
-    mean_attendance: float
-    correlation_attendance_gpa: float
-    students_at_risk: int
-    top_performers: int
-
-class PredictionResult(BaseModel):
-    """Prediction model result"""
-    usn: str
-    studentName: str
-    prediction: str
-    confidence: float
-    risk_factors: List[str]
-    recommendations: List[str]
-
-class VisualizationRequest(BaseModel):
-    """Visualization request model"""
-    chartType: str
-    department: Optional[str] = None
-    semester: Optional[int] = None
-    dataType: str = "all"
-
-class BatchAnalysisRequest(BaseModel):
-    """Batch analysis request"""
-    students: List[StudentData]
-    analysisType: str = "all"
+class EmployeeDeepDiveResponse(BaseModel):
+    employee: EmployeeData
+    calculatedEPI: float
+    category: str
+    riskPriority: str
+    radarScores: Dict[str, float]  # Productivity, Quality, Attendance, TargetAchievement, TaskCompletion
+    departmentPercentile: float
+    workforcePercentile: float
+    strengths: List[str]
+    weaknesses: List[str]
+    actionableRecommendations: List[str]
+    peerComparison: Dict[str, Any]

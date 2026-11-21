@@ -3,13 +3,12 @@ import axios from 'axios';
 
 const AuthContext = createContext(null);
 
-const API_URL = 'http://localhost:5000/api/auth';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for existing token on mount
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -21,43 +20,66 @@ export function AuthProvider({ children }) {
 
   const loadUser = async (token) => {
     try {
-      const res = await axios.get(`${API_URL}/me`, {
+      const res = await axios.get(`${API_BASE_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data.success) {
         setUser(res.data.data.user);
       } else {
         localStorage.removeItem('token');
+        setUser(null);
       }
     } catch (err) {
       localStorage.removeItem('token');
+      setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
   const login = async (email, password) => {
-    const res = await axios.post(`${API_URL}/login`, { email, password });
-    if (res.data.success) {
-      localStorage.setItem('token', res.data.data.token);
-      setUser(res.data.data.user);
-      return { success: true };
+    try {
+      const res = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+      if (res.data.success) {
+        localStorage.setItem('token', res.data.data.token);
+        setUser(res.data.data.user);
+        return { success: true };
+      }
+      return { success: false, error: res.data.error || 'Login failed' };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.error || 'Invalid credentials or server unreachable'
+      };
     }
-    return { success: false, error: 'Login failed' };
   };
 
-  const register = async (name, email, password) => {
-    const res = await axios.post(`${API_URL}/register`, { name, email, password });
-    if (res.data.success) {
-      localStorage.setItem('token', res.data.data.token);
-      setUser(res.data.data.user);
-      return { success: true, clonedStudents: res.data.data.clonedStudents };
+  const register = async (name, email, password, organization, role) => {
+    try {
+      const res = await axios.post(`${API_BASE_URL}/auth/register`, {
+        name,
+        email,
+        password,
+        organization,
+        role
+      });
+      if (res.data.success) {
+        localStorage.setItem('token', res.data.data.token);
+        setUser(res.data.data.user);
+        return { success: true, count: res.data.data.initialDatasetCount };
+      }
+      return { success: false, error: res.data.error || 'Registration failed' };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.error || 'Registration failed'
+      };
     }
-    return { success: false, error: 'Registration failed' };
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 

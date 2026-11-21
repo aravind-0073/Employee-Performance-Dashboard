@@ -1,396 +1,352 @@
 import express from 'express';
-import Student from '../models/Student.js';
+import Employee from '../models/Employee.js';
+import User from '../models/User.js';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
-import { insightsAPI, withErrorHandling } from '../services/analytics-client.js';
 
 const router = express.Router();
 
-// ─── Helper: fetch and map students ───────────────────────────────────────────
-async function fetchStudents(query) {
-  const docs = await Student.find(query).lean();
-  return docs.map(s => ({
-    usn: s.usn, studentName: s.studentName, department: s.department,
-    semester: s.semester, section: s.section,
-    attendancePercentage: s.attendancePercentage,
-    subject1Marks: s.subject1Marks, subject2Marks: s.subject2Marks,
-    subject3Marks: s.subject3Marks, subject4Marks: s.subject4Marks,
-    subject5Marks: s.subject5Marks, internalMarks: s.internalMarks,
-    gpa: s.gpa, cgpa: s.cgpa ?? 0,
-    email: s.email ?? null, phone: s.phone ?? null
-  }));
-}
-
-function buildQuery(req) {
-  const q = { userId: req.userId };
-  if (req.query.department) q.department = req.query.department;
-  if (req.query.semester) q.semester = parseInt(req.query.semester);
-  return q;
-}
-
-function styleHeaderRow(worksheet) {
+function styleExcelHeader(worksheet, numColumns = 10) {
   const headerRow = worksheet.getRow(1);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1e3a5f' } };
+  headerRow.height = 28;
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF1E293B' } // Slate 800
+  };
+  headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Existing Exports
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// EXCEL EXPORTS
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Export detained students as Excel
-router.get('/detained-excel', async (req, res) => {
+// 1. Full Employee Database
+router.get('/excel/full-database', async (req, res) => {
   try {
-    const query = buildQuery(req);
-    query.isDetained = true;
-    const detainedStudents = await Student.find(query).sort({ attendancePercentage: 1 });
+    const employees = await Employee.find({ userId: req.userId }).sort({ employeeId: 1 }).lean();
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Detained Students');
+    const sheet = workbook.addWorksheet('Employee Database');
 
-    worksheet.columns = [
-      { header: 'USN', key: 'usn', width: 12 },
-      { header: 'Student Name', key: 'studentName', width: 20 },
-      { header: 'Department', key: 'department', width: 15 },
-      { header: 'Semester', key: 'semester', width: 10 },
-      { header: 'Section', key: 'section', width: 10 },
-      { header: 'Attendance %', key: 'attendancePercentage', width: 12 },
-      { header: 'GPA', key: 'gpa', width: 8 },
-      { header: 'Detention Reason', key: 'detentionReason', width: 30 }
+    sheet.columns = [
+      { header: 'Employee ID', key: 'employeeId', width: 14 },
+      { header: 'Employee Name', key: 'employeeName', width: 22 },
+      { header: 'Department', key: 'department', width: 18 },
+      { header: 'Designation', key: 'designation', width: 25 },
+      { header: 'Experience (Yrs)', key: 'experience', width: 15 },
+      { header: 'Performance Score', key: 'performanceScore', width: 18 },
+      { header: 'Productivity Score', key: 'productivityScore', width: 18 },
+      { header: 'Attendance %', key: 'attendancePercentage', width: 15 },
+      { header: 'EPI (Index)', key: 'epi', width: 14 },
+      { header: 'Performance Category', key: 'performanceCategory', width: 22 },
+      { header: 'Risk Level', key: 'riskLevel', width: 14 },
+      { header: 'Quality Score', key: 'qualityScore', width: 14 },
+      { header: 'Target Rate %', key: 'targetCompletionRate', width: 15 },
+      { header: 'Projects Done', key: 'projectsCompleted', width: 14 },
+      { header: 'Manager', key: 'managerName', width: 20 },
+      { header: 'Email', key: 'email', width: 26 },
+      { header: 'Status', key: 'status', width: 12 }
     ];
 
-    detainedStudents.forEach(student => {
-      worksheet.addRow({
-        usn: student.usn, studentName: student.studentName,
-        department: student.department, semester: student.semester,
-        section: student.section, attendancePercentage: student.attendancePercentage,
-        gpa: student.gpa, detentionReason: student.detentionReason
+    styleExcelHeader(sheet);
+
+    employees.forEach(e => {
+      sheet.addRow({
+        ...e,
+        skills: Array.isArray(e.skills) ? e.skills.join(', ') : e.skills
       });
     });
 
-    styleHeaderRow(worksheet);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=detained_students.xlsx');
+    res.setHeader('Content-Disposition', 'attachment; filename="workforce_full_database.xlsx"');
     await workbook.xlsx.write(res);
+    res.end();
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Export detained students as PDF
-router.get('/detained-pdf', async (req, res) => {
+// 2. Performance Summary Excel
+router.get('/excel/performance-summary', async (req, res) => {
   try {
-    const query = buildQuery(req);
-    query.isDetained = true;
-    const students = await Student.find(query).sort({ attendancePercentage: 1 });
-    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-
-    const COLS = [
-      { x: 30, w: 68, label: 'USN', align: 'center' },
-      { x: 98, w: 110, label: 'Student Name', align: 'left' },
-      { x: 208, w: 98, label: 'Department', align: 'left' },
-      { x: 306, w: 30, label: 'Sem', align: 'center' },
-      { x: 336, w: 28, label: 'Sec', align: 'center' },
-      { x: 364, w: 58, label: 'Attendance %', align: 'center' },
-      { x: 422, w: 38, label: 'GPA', align: 'center' },
-      { x: 460, w: 352, label: 'Detention Reason', align: 'left' },
-    ];
-    const TABLE_LEFT = COLS[0].x;
-    const TABLE_RIGHT = COLS[COLS.length - 1].x + COLS[COLS.length - 1].w;
-    const TABLE_W = TABLE_RIGHT - TABLE_LEFT;
-    const ROW_H = 18;
-    const HDR_H = 22;
-    const PAGE_H = 595.28;
-    const FOOTER_Y = PAGE_H - 18;
-
-    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0, autoFirstPage: true });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=detained_students.pdf');
-    doc.pipe(res);
-
-    const fillRect = (x, y, w, h, color) => doc.rect(x, y, w, h).fill(color);
-    const drawText = (text, x, y, w, opts = {}) => {
-      const { fontSize = 8, font = 'Helvetica', color = '#222222', align = 'center' } = opts;
-      doc.font(font).fontSize(fontSize).fillColor(color).text(String(text ?? ''), x + 2, y, { width: w - 4, align, lineBreak: false });
-    };
-
-    const drawPageTitle = () => {
-      fillRect(0, 0, 842, 42, '#1e3a5f');
-      doc.font('Helvetica-Bold').fontSize(13).fillColor('#ffffff').text('DETAINED STUDENTS REPORT', 0, 10, { width: 842, align: 'center' });
-      doc.font('Helvetica').fontSize(7.5).fillColor('#aac4e0').text(`Generated: ${dateStr}${req.query.department ? '  |  Dept: ' + req.query.department : ''}  |  Total Detained: ${students.length}`, 0, 27, { width: 842, align: 'center' });
-      return 46;
-    };
-
-    const drawColHeader = (y) => {
-      fillRect(TABLE_LEFT, y, TABLE_W, HDR_H, '#c0392b');
-      COLS.forEach(col => { drawText(col.label, col.x, y + 7, col.w, { font: 'Helvetica-Bold', color: '#ffffff', align: 'center' }); });
-      return y + HDR_H;
-    };
-
-    const drawVLines = (yTop, yBot) => {
-      doc.strokeColor('#aaaaaa').lineWidth(0.35);
-      COLS.forEach(col => { doc.moveTo(col.x, yTop).lineTo(col.x, yBot).stroke(); });
-      doc.moveTo(TABLE_RIGHT, yTop).lineTo(TABLE_RIGHT, yBot).stroke();
-      doc.rect(TABLE_LEFT, yTop, TABLE_W, yBot - yTop).strokeColor('#888888').lineWidth(0.6).stroke();
-    };
-
-    const drawFooter = (pageNum) => {
-      doc.font('Helvetica').fontSize(7).fillColor('#999999').text(`Student Performance Analysis Dashboard  |  Page ${pageNum}  |  Confidential`, 0, FOOTER_Y, { width: 842, align: 'center' });
-    };
-
-    const drawRow = (student, y, idx) => {
-      const bg = idx % 2 === 0 ? '#ffffff' : '#fdf0f0';
-      fillRect(TABLE_LEFT, y, TABLE_W, ROW_H, bg);
-      doc.moveTo(TABLE_LEFT, y + ROW_H).lineTo(TABLE_RIGHT, y + ROW_H).strokeColor('#ddc8c8').lineWidth(0.3).stroke();
-      const textY = y + 5;
-      const vals = [student.usn, student.studentName, student.department, student.semester, student.section, (student.attendancePercentage ?? 0) + '%', student.gpa, student.detentionReason || 'Attendance below 75%'];
-      COLS.forEach((col, i) => {
-        const isRed = i === 5 && (student.attendancePercentage ?? 100) < 65;
-        drawText(vals[i], col.x, textY, col.w, { align: col.align, color: isRed ? '#c0392b' : '#222222' });
-      });
-    };
-
-    let pageY = drawPageTitle();
-    let tableTop = pageY;
-    pageY = drawColHeader(pageY);
-    let rowIdx = 0;
-    let pageNum = 1;
-
-    students.forEach(student => {
-      if (pageY + ROW_H > FOOTER_Y - 10) {
-        drawVLines(tableTop, pageY);
-        drawFooter(pageNum++);
-        doc.addPage();
-        pageY = drawPageTitle();
-        tableTop = pageY;
-        pageY = drawColHeader(pageY);
-        rowIdx = 0;
-      }
-      drawRow(student, pageY, rowIdx++);
-      pageY += ROW_H;
-    });
-
-    drawVLines(tableTop, pageY);
-    drawFooter(pageNum);
-    doc.end();
-  } catch (error) {
-    console.error('PDF error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// All students Excel
-router.get('/all-students-excel', async (req, res) => {
-  try {
-    const query = buildQuery(req);
-    const students = await Student.find(query).sort({ usn: 1 });
+    const employees = await Employee.find({ userId: req.userId }).sort({ performanceScore: -1 }).lean();
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Students');
+    const sheet = workbook.addWorksheet('Performance Summary');
 
-    worksheet.columns = [
-      { header: 'USN', key: 'usn', width: 12 },
-      { header: 'Name', key: 'studentName', width: 20 },
-      { header: 'Department', key: 'department', width: 15 },
-      { header: 'Semester', key: 'semester', width: 10 },
-      { header: 'Section', key: 'section', width: 10 },
-      { header: 'Attendance %', key: 'attendancePercentage', width: 12 },
-      { header: 'Subject 1', key: 'subject1Marks', width: 10 },
-      { header: 'Subject 2', key: 'subject2Marks', width: 10 },
-      { header: 'Subject 3', key: 'subject3Marks', width: 10 },
-      { header: 'Subject 4', key: 'subject4Marks', width: 10 },
-      { header: 'Subject 5', key: 'subject5Marks', width: 10 },
-      { header: 'Internal Marks', key: 'internalMarks', width: 12 },
-      { header: 'GPA', key: 'gpa', width: 8 },
-      { header: 'CGPA', key: 'cgpa', width: 8 },
-      { header: 'Detained', key: 'isDetained', width: 10 }
+    sheet.columns = [
+      { header: 'Employee ID', key: 'employeeId', width: 14 },
+      { header: 'Name', key: 'employeeName', width: 22 },
+      { header: 'Department', key: 'department', width: 18 },
+      { header: 'Designation', key: 'designation', width: 24 },
+      { header: 'Performance Score', key: 'performanceScore', width: 18 },
+      { header: 'Productivity Score', key: 'productivityScore', width: 18 },
+      { header: 'Attendance %', key: 'attendancePercentage', width: 15 },
+      { header: 'EPI Rating', key: 'epi', width: 14 },
+      { header: 'Category', key: 'performanceCategory', width: 18 }
     ];
 
-    students.forEach(student => {
-      worksheet.addRow({
-        usn: student.usn, studentName: student.studentName,
-        department: student.department, semester: student.semester,
-        section: student.section, attendancePercentage: student.attendancePercentage,
-        subject1Marks: student.subject1Marks, subject2Marks: student.subject2Marks,
-        subject3Marks: student.subject3Marks, subject4Marks: student.subject4Marks,
-        subject5Marks: student.subject5Marks, internalMarks: student.internalMarks,
-        gpa: student.gpa, cgpa: student.cgpa,
-        isDetained: student.isDetained ? 'Yes' : 'No'
-      });
+    styleExcelHeader(sheet);
+
+    employees.forEach(e => {
+      sheet.addRow(e);
     });
 
-    styleHeaderRow(worksheet);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=all_students.xlsx');
+    res.setHeader('Content-Disposition', 'attachment; filename="employee_performance_summary.xlsx"');
     await workbook.xlsx.write(res);
+    res.end();
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// NEW Export Endpoints
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// All students PDF
-router.get('/all-students-pdf', async (req, res) => {
+// 3. Underperforming & Risk Assessment Excel
+router.get('/excel/underperforming', async (req, res) => {
   try {
-    const query = buildQuery(req);
-    const students = await Student.find(query).sort({ usn: 1 });
-    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const atRisk = await Employee.find({
+      userId: req.userId,
+      riskLevel: { $in: ['Critical', 'High', 'Medium'] }
+    }).sort({ riskLevel: 1, performanceScore: 1 }).lean();
 
-    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30, autoFirstPage: true });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=all_students.pdf');
-    doc.pipe(res);
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Underperforming & Risk');
 
-    // Title
-    doc.font('Helvetica-Bold').fontSize(16).fillColor('#1e3a5f').text('ALL STUDENTS REPORT', { align: 'center' });
-    doc.font('Helvetica').fontSize(9).fillColor('#666666').text(`Generated: ${dateStr} | Total: ${students.length} students${req.query.department ? ' | Dept: ' + req.query.department : ''}`, { align: 'center' });
-    doc.moveDown(1);
+    sheet.columns = [
+      { header: 'Employee ID', key: 'employeeId', width: 14 },
+      { header: 'Name', key: 'employeeName', width: 22 },
+      { header: 'Department', key: 'department', width: 18 },
+      { header: 'Designation', key: 'designation', width: 24 },
+      { header: 'Risk Priority', key: 'riskLevel', width: 16 },
+      { header: 'Performance', key: 'performanceScore', width: 14 },
+      { header: 'Productivity', key: 'productivityScore', width: 14 },
+      { header: 'Attendance %', key: 'attendancePercentage', width: 14 },
+      { header: 'Target Rate %', key: 'targetCompletionRate', width: 14 },
+      { header: 'Manager', key: 'managerName', width: 20 },
+      { header: 'Recommended Action', key: 'action', width: 32 }
+    ];
 
-    // Table header
-    const headers = ['USN', 'Name', 'Dept', 'Sem', 'Sec', 'Att%', 'GPA', 'CGPA', 'Status'];
-    const colWidths = [70, 110, 80, 35, 30, 45, 40, 40, 60];
-    let y = doc.y;
-    let x = 30;
-    doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
-    headers.forEach((h, i) => {
-      doc.rect(x, y, colWidths[i], 18).fill('#1e3a5f');
-      doc.fillColor('#ffffff').text(h, x + 2, y + 5, { width: colWidths[i] - 4, align: 'center' });
-      x += colWidths[i];
-    });
-    y += 20;
+    styleExcelHeader(sheet);
 
-    // Rows
-    doc.font('Helvetica').fontSize(7).fillColor('#333333');
-    students.forEach((s, idx) => {
-      if (y > 550) {
-        doc.addPage();
-        y = 30;
-        x = 30;
-        doc.font('Helvetica-Bold').fontSize(8);
-        headers.forEach((h, i) => {
-          doc.rect(x, y, colWidths[i], 18).fill('#1e3a5f');
-          doc.fillColor('#ffffff').text(h, x + 2, y + 5, { width: colWidths[i] - 4, align: 'center' });
-          x += colWidths[i];
-        });
-        y += 20;
-        doc.font('Helvetica').fontSize(7).fillColor('#333333');
-      }
-      const bg = idx % 2 === 0 ? '#ffffff' : '#f0f4f8';
-      x = 30;
-      const vals = [s.usn, s.studentName, s.department, s.semester, s.section, `${s.attendancePercentage}%`, s.gpa, s.cgpa, s.isDetained ? 'Detained' : 'Active'];
-      vals.forEach((v, i) => {
-        doc.rect(x, y, colWidths[i], 16).fill(bg);
-        doc.fillColor(i === 8 && s.isDetained ? '#c0392b' : '#333333').text(String(v ?? ''), x + 2, y + 4, { width: colWidths[i] - 4, align: 'center' });
-        x += colWidths[i];
+    atRisk.forEach(e => {
+      let action = 'Regular check-in';
+      if (e.riskLevel === 'Critical') action = 'Initiate Formal 30-Day PIP';
+      else if (e.riskLevel === 'High') action = 'Bi-weekly Coaching & Skills Retraining';
+      else if (e.riskLevel === 'Medium') action = 'Manager 1-on-1 Alignment Check';
+
+      sheet.addRow({
+        ...e,
+        action
       });
-      y += 16;
     });
 
-    doc.end();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="underperformance_risk_report.xlsx"');
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Department report Excel
-router.get('/department-report-excel', async (req, res) => {
+// 4. Departmental Benchmarking Excel
+router.get('/excel/departmental-benchmark', async (req, res) => {
   try {
-    const students = await fetchStudents(buildQuery(req));
-    let ranking = [];
-    try {
-      const result = await withErrorHandling(insightsAPI.departmentRanking(students));
-      ranking = result.data || [];
-    } catch (e) {
-      // fall back to basic stats
+    const employees = await Employee.find({ userId: req.userId }).lean();
+
+    const groups = {};
+    for (const e of employees) {
+      if (!groups[e.department]) groups[e.department] = [];
+      groups[e.department].push(e);
     }
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Department Analytics');
+    const deptMetrics = Object.entries(groups).map(([dept, list]) => {
+      const n = list.length;
+      const avgPerf = list.reduce((a, b) => a + b.performanceScore, 0) / n;
+      const avgProd = list.reduce((a, b) => a + b.productivityScore, 0) / n;
+      const avgAtt = list.reduce((a, b) => a + b.attendancePercentage, 0) / n;
+      const avgTarget = list.reduce((a, b) => a + b.targetCompletionRate, 0) / n;
+      const score = Number(((0.40 * avgPerf) + (0.30 * avgProd) + (0.20 * avgAtt) + (0.10 * avgTarget)).toFixed(2));
 
-    worksheet.columns = [
-      { header: 'Rank', key: 'rank', width: 8 },
-      { header: 'Department', key: 'department', width: 20 },
-      { header: 'Weighted Score', key: 'weighted_score', width: 15 },
-      { header: 'Total Students', key: 'total_students', width: 15 },
-      { header: 'Mean GPA', key: 'mean_gpa', width: 12 },
-      { header: 'Mean Attendance %', key: 'mean_attendance', width: 18 },
-      { header: 'Pass %', key: 'pass_percentage', width: 10 },
-      { header: 'Fail %', key: 'fail_percentage', width: 10 },
-      { header: 'Detained Count', key: 'detained_count', width: 15 },
-      { header: 'Detention Rate %', key: 'detention_rate', width: 15 },
-      { header: 'Top Student', key: 'top_student_name', width: 20 },
-      { header: 'Top Student GPA', key: 'top_student_gpa', width: 15 },
-      { header: 'Avg Subject Marks', key: 'avg_subject_marks', width: 15 },
-    ];
-
-    ranking.forEach(r => {
-      worksheet.addRow({
-        rank: r.rank, department: r.department, weighted_score: r.weighted_score,
-        total_students: r.total_students, mean_gpa: r.mean_gpa,
-        mean_attendance: r.mean_attendance, pass_percentage: r.pass_percentage,
-        fail_percentage: r.fail_percentage, detained_count: r.detained_count,
-        detention_rate: r.detention_rate,
-        top_student_name: r.top_student?.name || '', top_student_gpa: r.top_student?.gpa || '',
-        avg_subject_marks: r.avg_subject_marks
-      });
+      return {
+        department: dept,
+        headcount: n,
+        compositeScore: score,
+        averagePerformance: Number(avgPerf.toFixed(1)),
+        averageProductivity: Number(avgProd.toFixed(1)),
+        averageAttendance: Number(avgAtt.toFixed(1)),
+        averageTargetAchievement: Number(avgTarget.toFixed(1)),
+        highPerformers: list.filter(e => e.performanceScore >= 80).length,
+        underperformers: list.filter(e => e.performanceScore < 60).length,
+        manager: list[0]?.managerName || 'Department Head'
+      };
     });
 
-    styleHeaderRow(worksheet);
+    deptMetrics.sort((a, b) => b.compositeScore - a.compositeScore);
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Department Benchmarks');
+
+    sheet.columns = [
+      { header: 'Rank', key: 'rank', width: 10 },
+      { header: 'Department', key: 'department', width: 22 },
+      { header: 'Composite Score', key: 'compositeScore', width: 18 },
+      { header: 'Headcount', key: 'headcount', width: 14 },
+      { header: 'Avg Performance', key: 'averagePerformance', width: 18 },
+      { header: 'Avg Productivity', key: 'averageProductivity', width: 18 },
+      { header: 'Avg Attendance %', key: 'averageAttendance', width: 18 },
+      { header: 'High Performers', key: 'highPerformers', width: 16 },
+      { header: 'Underperformers', key: 'underperformers', width: 16 },
+      { header: 'Manager', key: 'manager', width: 22 }
+    ];
+
+    styleExcelHeader(sheet);
+
+    deptMetrics.forEach((d, idx) => {
+      sheet.addRow({ rank: idx + 1, ...d });
+    });
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=department_report.xlsx');
+    res.setHeader('Content-Disposition', 'attachment; filename="department_benchmarks.xlsx"');
     await workbook.xlsx.write(res);
+    res.end();
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Department report PDF
-router.get('/department-report-pdf', async (req, res) => {
+// 5. High Performers Excel
+router.get('/excel/high-performers', async (req, res) => {
   try {
-    const students = await fetchStudents(buildQuery(req));
-    let ranking = [];
-    try {
-      const result = await withErrorHandling(insightsAPI.departmentRanking(students));
-      ranking = result.data || [];
-    } catch (e) {}
-    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const highPerformers = await Employee.find({
+      userId: req.userId,
+      performanceScore: { $gte: 80 }
+    }).sort({ performanceScore: -1 }).lean();
 
-    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('High Performers');
+
+    sheet.columns = [
+      { header: 'Employee ID', key: 'employeeId', width: 14 },
+      { header: 'Name', key: 'employeeName', width: 22 },
+      { header: 'Department', key: 'department', width: 18 },
+      { header: 'Designation', key: 'designation', width: 24 },
+      { header: 'Performance Score', key: 'performanceScore', width: 18 },
+      { header: 'Productivity Score', key: 'productivityScore', width: 18 },
+      { header: 'Attendance %', key: 'attendancePercentage', width: 15 },
+      { header: 'EPI Rating', key: 'epi', width: 14 },
+      { header: 'Projects Done', key: 'projectsCompleted', width: 14 }
+    ];
+
+    styleExcelHeader(sheet);
+
+    highPerformers.forEach(e => {
+      sheet.addRow(e);
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="high_performing_employees.xlsx"');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PDF EXPORTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 1. Executive Workforce Performance Report (PDF)
+router.get('/pdf/executive-workforce', async (req, res) => {
+  try {
+    const [user, employees] = await Promise.all([
+      User.findById(req.userId).lean(),
+      Employee.find({ userId: req.userId }).sort({ performanceScore: -1 }).lean()
+    ]);
+
+    const orgName = user?.organization || 'Enterprise Workforce HR';
+    const total = employees.length;
+    const avgPerf = total ? (employees.reduce((a, b) => a + b.performanceScore, 0) / total).toFixed(1) : '0';
+    const avgProd = total ? (employees.reduce((a, b) => a + b.productivityScore, 0) / total).toFixed(1) : '0';
+    const avgAtt = total ? (employees.reduce((a, b) => a + b.attendancePercentage, 0) / total).toFixed(1) : '0';
+    const highCount = employees.filter(e => e.performanceScore >= 80).length;
+    const underCount = employees.filter(e => e.performanceScore < 60).length;
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=department_report.pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="executive_workforce_report.pdf"');
     doc.pipe(res);
 
-    doc.font('Helvetica-Bold').fontSize(16).fillColor('#1e3a5f').text('DEPARTMENT ANALYTICS REPORT', { align: 'center' });
-    doc.font('Helvetica').fontSize(9).fillColor('#666666').text(`Generated: ${dateStr} | ${ranking.length} Departments`, { align: 'center' });
-    doc.moveDown(1);
+    // Header Banner
+    doc.rect(40, 40, 515, 60).fill('#0F172A');
+    doc.fillColor('#FFFFFF').fontSize(18).text(orgName.toUpperCase(), 55, 52, { bold: true });
+    doc.fontSize(11).fillColor('#94A3B8').text('EXECUTIVE WORKFORCE PERFORMANCE REPORT', 55, 75);
+    doc.fontSize(9).text(`Generated: ${new Date().toLocaleDateString()} | Author: ${user?.name || 'HR Admin'}`, 340, 75);
 
-    const headers = ['Rank', 'Department', 'Score', 'Students', 'Avg GPA', 'Att%', 'Pass%', 'Detained', 'Top Student'];
-    const colWidths = [35, 100, 50, 55, 55, 50, 50, 55, 130];
-    let y = doc.y;
-    let x = 30;
-    doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
-    headers.forEach((h, i) => {
-      doc.rect(x, y, colWidths[i], 18).fill('#1e3a5f');
-      doc.fillColor('#ffffff').text(h, x + 2, y + 5, { width: colWidths[i] - 4, align: 'center' });
-      x += colWidths[i];
-    });
-    y += 20;
+    doc.moveDown(4);
 
-    doc.font('Helvetica').fontSize(7).fillColor('#333333');
-    ranking.forEach((r, idx) => {
-      x = 30;
-      const bg = idx % 2 === 0 ? '#ffffff' : '#f0f4f8';
-      const vals = [r.rank, r.department, r.weighted_score, r.total_students, r.mean_gpa, `${r.mean_attendance}%`, `${r.pass_percentage}%`, r.detained_count, `${r.top_student?.name || ''} (${r.top_student?.gpa || ''})`];
-      vals.forEach((v, i) => {
-        doc.rect(x, y, colWidths[i], 16).fill(bg);
-        doc.fillColor('#333333').text(String(v ?? ''), x + 2, y + 4, { width: colWidths[i] - 4, align: 'center' });
-        x += colWidths[i];
-      });
-      y += 16;
+    // Executive Metrics Summary
+    doc.fillColor('#0F172A').fontSize(14).text('Executive KPI Summary', 40, 120, { bold: true });
+    doc.rect(40, 138, 515, 1).fill('#E2E8F0');
+
+    const kpis = [
+      { label: 'Total Headcount', val: total.toString() },
+      { label: 'Avg Performance', val: `${avgPerf}%` },
+      { label: 'Avg Productivity', val: `${avgProd}%` },
+      { label: 'Avg Attendance', val: `${avgAtt}%` },
+      { label: 'High Performers', val: highCount.toString() },
+      { label: 'Underperforming', val: underCount.toString() }
+    ];
+
+    let startX = 40;
+    kpis.forEach((kpi, idx) => {
+      const x = startX + (idx % 3) * 175;
+      const y = 150 + Math.floor(idx / 3) * 55;
+      doc.rect(x, y, 165, 45).fill('#F8FAFC');
+      doc.rect(x, y, 165, 45).stroke('#CBD5E1');
+      doc.fillColor('#64748B').fontSize(9).text(kpi.label, x + 10, y + 8);
+      doc.fillColor('#0F172A').fontSize(16).text(kpi.val, x + 10, y + 22, { bold: true });
     });
+
+    // Top Performers Table
+    doc.fillColor('#0F172A').fontSize(14).text('Top Performing Leaders', 40, 280, { bold: true });
+    doc.rect(40, 298, 515, 1).fill('#E2E8F0');
+
+    // Table Header
+    doc.rect(40, 310, 515, 20).fill('#1E293B');
+    doc.fillColor('#FFFFFF').fontSize(8);
+    doc.text('ID', 45, 316, { width: 50 });
+    doc.text('EMPLOYEE NAME', 100, 316, { width: 130 });
+    doc.text('DEPARTMENT', 235, 316, { width: 90 });
+    doc.text('PERF.', 330, 316, { width: 45 });
+    doc.text('PROD.', 380, 316, { width: 45 });
+    doc.text('ATTN.', 430, 316, { width: 45 });
+    doc.text('EPI RATING', 480, 316, { width: 70 });
+
+    let tableY = 330;
+    employees.slice(0, 10).forEach((emp, i) => {
+      const bg = i % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+      doc.rect(40, tableY, 515, 18).fill(bg);
+      doc.fillColor('#0F172A').fontSize(8);
+      doc.text(emp.employeeId, 45, tableY + 5, { width: 50 });
+      doc.text(emp.employeeName, 100, tableY + 5, { width: 130 });
+      doc.text(emp.department, 235, tableY + 5, { width: 90 });
+      doc.text(`${emp.performanceScore}%`, 330, tableY + 5, { width: 45 });
+      doc.text(`${emp.productivityScore}%`, 380, tableY + 5, { width: 45 });
+      doc.text(`${emp.attendancePercentage}%`, 430, tableY + 5, { width: 45 });
+      doc.text(`${emp.epi || '--'} (${emp.performanceCategory || ''})`, 480, tableY + 5, { width: 70 });
+      tableY += 18;
+    });
+
+    // Sign-off section
+    doc.rect(40, 680, 515, 1).fill('#CBD5E1');
+    doc.fillColor('#475569').fontSize(9);
+    doc.text('Human Resources Sign-off: _______________________________', 50, 710);
+    doc.text('Executive Review Date: ___________________', 350, 710);
+    doc.fontSize(8).fillColor('#94A3B8').text('Confidential - For Internal Organizational Management Only', 170, 770);
 
     doc.end();
   } catch (error) {
@@ -398,221 +354,162 @@ router.get('/department-report-pdf', async (req, res) => {
   }
 });
 
-// Top performers Excel
-router.get('/top-performers-excel', async (req, res) => {
+// 2. Individual Employee Appraisal PDF
+router.get('/pdf/employee/:employeeId', async (req, res) => {
   try {
-    const query = buildQuery(req);
-    const limit = parseInt(req.query.limit) || 10;
-    const students = await Student.find(query).sort({ gpa: -1 }).limit(limit);
+    const employee = await Employee.findOne({
+      userId: req.userId,
+      employeeId: req.params.employeeId
+    }).lean();
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Top Performers');
+    if (!employee) {
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
 
-    worksheet.columns = [
-      { header: 'Rank', key: 'rank', width: 8 },
-      { header: 'USN', key: 'usn', width: 12 },
-      { header: 'Name', key: 'studentName', width: 20 },
-      { header: 'Department', key: 'department', width: 15 },
-      { header: 'Semester', key: 'semester', width: 10 },
-      { header: 'GPA', key: 'gpa', width: 10 },
-      { header: 'CGPA', key: 'cgpa', width: 10 },
-      { header: 'Attendance %', key: 'attendancePercentage', width: 12 },
-      { header: 'Internal Marks', key: 'internalMarks', width: 12 },
-    ];
-
-    students.forEach((s, i) => {
-      worksheet.addRow({
-        rank: i + 1, usn: s.usn, studentName: s.studentName,
-        department: s.department, semester: s.semester,
-        gpa: s.gpa, cgpa: s.cgpa,
-        attendancePercentage: s.attendancePercentage, internalMarks: s.internalMarks
-      });
-    });
-
-    styleHeaderRow(worksheet);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=top_${limit}_performers.xlsx`);
-    await workbook.xlsx.write(res);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Risk report Excel
-router.get('/risk-report-excel', async (req, res) => {
-  try {
-    const students = await fetchStudents(buildQuery(req));
-    let riskData = [];
-    try {
-      const result = await withErrorHandling(insightsAPI.riskScores(students));
-      riskData = (result.data || []).filter(r => r.risk_level !== 'Low Risk');
-    } catch (e) {}
-
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Academic Risk Report');
-
-    worksheet.columns = [
-      { header: 'USN', key: 'usn', width: 12 },
-      { header: 'Name', key: 'studentName', width: 20 },
-      { header: 'Department', key: 'department', width: 15 },
-      { header: 'Semester', key: 'semester', width: 10 },
-      { header: 'Risk Score', key: 'risk_score', width: 12 },
-      { header: 'Risk Level', key: 'risk_level', width: 12 },
-      { header: 'Attendance', key: 'attendance', width: 12 },
-      { header: 'GPA', key: 'gpa', width: 10 },
-      { header: 'Weak Subjects', key: 'weak_subjects', width: 15 },
-      { header: 'Avg Marks', key: 'avg_marks', width: 12 },
-    ];
-
-    riskData.sort((a, b) => b.risk_score - a.risk_score).forEach(r => {
-      worksheet.addRow({
-        usn: r.usn, studentName: r.studentName,
-        department: r.department, semester: r.semester,
-        risk_score: r.risk_score, risk_level: r.risk_level,
-        attendance: r.factors?.attendance, gpa: r.factors?.gpa,
-        weak_subjects: r.factors?.weak_subjects, avg_marks: r.factors?.avg_marks
-      });
-    });
-
-    styleHeaderRow(worksheet);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=risk_report.xlsx');
-    await workbook.xlsx.write(res);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Risk report PDF
-router.get('/risk-report-pdf', async (req, res) => {
-  try {
-    const students = await fetchStudents(buildQuery(req));
-    let riskData = [];
-    try {
-      const result = await withErrorHandling(insightsAPI.riskScores(students));
-      riskData = (result.data || []).filter(r => r.risk_level !== 'Low Risk');
-    } catch (e) {}
-    riskData.sort((a, b) => b.risk_score - a.risk_score);
-
-    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=risk_report.pdf');
-    doc.pipe(res);
-
-    doc.font('Helvetica-Bold').fontSize(16).fillColor('#c0392b').text('ACADEMIC RISK ASSESSMENT REPORT', { align: 'center' });
-    doc.font('Helvetica').fontSize(9).fillColor('#666666').text(`Generated: ${dateStr} | ${riskData.length} at-risk students`, { align: 'center' });
-    doc.moveDown(1);
-
-    const headers = ['USN', 'Name', 'Dept', 'Score', 'Level', 'Att%', 'GPA', 'Weak Sub'];
-    const colWidths = [70, 120, 80, 50, 70, 50, 50, 50];
-    let y = doc.y;
-    let x = 50;
-    doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
-    headers.forEach((h, i) => {
-      doc.rect(x, y, colWidths[i], 18).fill('#c0392b');
-      doc.fillColor('#ffffff').text(h, x + 2, y + 5, { width: colWidths[i] - 4, align: 'center' });
-      x += colWidths[i];
-    });
-    y += 20;
-
-    doc.font('Helvetica').fontSize(7).fillColor('#333333');
-    riskData.forEach((r, idx) => {
-      if (y > 550) { doc.addPage(); y = 30; }
-      x = 50;
-      const bg = idx % 2 === 0 ? '#ffffff' : '#fdf0f0';
-      const vals = [r.usn, r.studentName, r.department, r.risk_score, r.risk_level, `${r.factors?.attendance}%`, r.factors?.gpa, r.factors?.weak_subjects];
-      vals.forEach((v, i) => {
-        doc.rect(x, y, colWidths[i], 16).fill(bg);
-        doc.fillColor(i === 4 && r.risk_level === 'High Risk' ? '#c0392b' : '#333333').text(String(v ?? ''), x + 2, y + 4, { width: colWidths[i] - 4, align: 'center' });
-        x += colWidths[i];
-      });
-      y += 16;
-    });
-
-    doc.end();
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Executive Summary PDF
-router.get('/executive-summary-pdf', async (req, res) => {
-  try {
-    const allStudents = await Student.find(buildQuery(req)).lean();
-    const students = await fetchStudents(buildQuery(req));
-    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const total = allStudents.length;
-
-    // Calculate stats
-    const avgGPA = total > 0 ? (allStudents.reduce((s, st) => s + st.gpa, 0) / total).toFixed(2) : 0;
-    const avgAtt = total > 0 ? (allStudents.reduce((s, st) => s + st.attendancePercentage, 0) / total).toFixed(2) : 0;
-    const passCount = allStudents.filter(s => s.gpa >= 5.5).length;
-    const detainedCount = allStudents.filter(s => s.isDetained).length;
-
-    let ranking = [];
-    try {
-      const result = await withErrorHandling(insightsAPI.departmentRanking(students));
-      ranking = result.data || [];
-    } catch (e) {}
-
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=executive_summary.pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="appraisal_${employee.employeeId}.pdf"`);
     doc.pipe(res);
 
     // Header
-    doc.rect(0, 0, 595, 80).fill('#1e3a5f');
-    doc.font('Helvetica-Bold').fontSize(22).fillColor('#ffffff').text('EXECUTIVE SUMMARY', 40, 20);
-    doc.font('Helvetica').fontSize(10).fillColor('#aac4e0').text(`Student Performance Analysis | ${dateStr}`, 40, 48);
+    doc.rect(40, 40, 515, 55).fill('#0F172A');
+    doc.fillColor('#FFFFFF').fontSize(16).text('INDIVIDUAL PERFORMANCE EVALUATION', 55, 50, { bold: true });
+    doc.fontSize(10).fillColor('#94A3B8').text(`Confidential Performance Appraisal Record | ID: ${employee.employeeId}`, 55, 72);
 
-    doc.moveDown(3);
+    // Profile Box
+    doc.rect(40, 110, 515, 80).fill('#F8FAFC');
+    doc.rect(40, 110, 515, 80).stroke('#CBD5E1');
 
-    // Key Metrics Section
-    doc.font('Helvetica-Bold').fontSize(14).fillColor('#1e3a5f').text('Key Performance Indicators', 40, 100);
-    doc.moveDown(0.5);
+    doc.fillColor('#0F172A').fontSize(14).text(employee.employeeName, 55, 122, { bold: true });
+    doc.fontSize(10).fillColor('#475569').text(`${employee.designation}  •  ${employee.department}`, 55, 140);
+    doc.fontSize(9).text(`Experience: ${employee.experience} yrs  |  Joining Date: ${new Date(employee.joiningDate).toLocaleDateString()}`, 55, 158);
+    doc.text(`Reporting Manager: ${employee.managerName || 'Unassigned'}  |  Email: ${employee.email || 'N/A'}`, 55, 172);
+
+    // Key Operational Metrics Grid
+    doc.fillColor('#0F172A').fontSize(12).text('Performance Metric Breakdown', 40, 210, { bold: true });
+    doc.rect(40, 225, 515, 1).fill('#E2E8F0');
 
     const metrics = [
-      ['Total Students', total],
-      ['Average GPA', avgGPA],
-      ['Average Attendance', `${avgAtt}%`],
-      ['Pass Rate', `${total > 0 ? ((passCount / total) * 100).toFixed(1) : 0}%`],
-      ['Fail Rate', `${total > 0 ? (((total - passCount) / total) * 100).toFixed(1) : 0}%`],
-      ['Detained Students', detainedCount],
+      { label: 'Performance Score', val: `${employee.performanceScore}%`, cat: employee.performanceCategory },
+      { label: 'Productivity Score', val: `${employee.productivityScore}%`, cat: 'Daily Output' },
+      { label: 'Attendance Rate', val: `${employee.attendancePercentage}%`, cat: 'Presence' },
+      { label: 'Deliverable Quality', val: `${employee.qualityScore || 80}%`, cat: 'Accuracy' },
+      { label: 'Target Achievement', val: `${employee.targetCompletionRate || 85}%`, cat: 'Milestones' },
+      { label: 'Composite EPI Rating', val: `${employee.epi || 78}`, cat: 'Overall Index' }
     ];
 
-    let my = doc.y;
-    metrics.forEach(([label, value], i) => {
-      const col = i % 3;
-      const row = Math.floor(i / 3);
-      const mx = 40 + col * 175;
-      const mmy = my + row * 55;
-
-      doc.rect(mx, mmy, 160, 45).fill('#f0f4f8').stroke();
-      doc.font('Helvetica').fontSize(9).fillColor('#666666').text(label, mx + 10, mmy + 8);
-      doc.font('Helvetica-Bold').fontSize(18).fillColor('#1e3a5f').text(String(value), mx + 10, mmy + 22);
+    metrics.forEach((m, idx) => {
+      const x = 40 + (idx % 3) * 175;
+      const y = 240 + Math.floor(idx / 3) * 60;
+      doc.rect(x, y, 165, 50).fill('#FFFFFF');
+      doc.rect(x, y, 165, 50).stroke('#E2E8F0');
+      doc.fillColor('#64748B').fontSize(8).text(m.label, x + 10, y + 8);
+      doc.fillColor('#0F172A').fontSize(15).text(m.val, x + 10, y + 20, { bold: true });
+      doc.fillColor('#3B82F6').fontSize(8).text(m.cat, x + 10, y + 38);
     });
 
-    doc.y = my + 130;
+    // Recommendations and Development Section
+    doc.fillColor('#0F172A').fontSize(12).text('Managerial Recommendations & Growth Action Plan', 40, 380, { bold: true });
+    doc.rect(40, 395, 515, 1).fill('#E2E8F0');
 
-    // Department Rankings
-    if (ranking.length > 0) {
-      doc.font('Helvetica-Bold').fontSize(14).fillColor('#1e3a5f').text('Department Rankings', 40);
-      doc.moveDown(0.5);
+    const actions = [
+      employee.performanceScore >= 80
+        ? 'Identified for high-potential leadership mentoring and cross-functional technical leadership.'
+        : 'Recommended for targeted coaching in specific deliverable velocity and sprint planning.',
+      employee.attendancePercentage < 75
+        ? 'Mandatory HR attendance review to identify scheduling friction and ensure organizational compliance.'
+        : 'Maintains healthy workplace attendance aligning with high operational standards.',
+      'Quarterly goal realignment scheduled with department head.'
+    ];
 
-      ranking.forEach((r, i) => {
-        if (doc.y > 750) { doc.addPage(); }
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333').text(`${r.rank}. ${r.department}`, 50);
-        doc.font('Helvetica').fontSize(8).fillColor('#666666').text(
-          `Score: ${r.weighted_score} | GPA: ${r.mean_gpa} | Attendance: ${r.mean_attendance}% | Pass: ${r.pass_percentage}% | Students: ${r.total_students}`, 65
-        );
-        doc.moveDown(0.3);
+    actions.forEach((act, idx) => {
+      doc.fillColor('#1E293B').fontSize(9).text(`•  ${act}`, 50, 410 + idx * 24, { width: 490 });
+    });
+
+    // Interventions History if any
+    if (employee.interventions && employee.interventions.length > 0) {
+      doc.fillColor('#0F172A').fontSize(12).text('Logged Interventions & Review History', 40, 500, { bold: true });
+      doc.rect(40, 515, 515, 1).fill('#E2E8F0');
+
+      let intY = 525;
+      employee.interventions.slice(0, 4).forEach(item => {
+        doc.fillColor('#475569').fontSize(8);
+        doc.text(`${new Date(item.actionDate).toLocaleDateString()} - [${item.actionType}] by ${item.assignedBy}: ${item.note}`, 50, intY);
+        intY += 16;
       });
     }
 
-    // Footer
-    doc.font('Helvetica').fontSize(7).fillColor('#999999');
-    doc.text('Student Performance Analysis Dashboard | Confidential | Generated automatically', 40, 770, { align: 'center' });
+    // Signatures
+    doc.rect(40, 680, 515, 1).fill('#CBD5E1');
+    doc.fillColor('#475569').fontSize(9);
+    doc.text('Employee Signature: _______________________', 50, 710);
+    doc.text('Manager Signature: _______________________', 320, 710);
+    doc.fontSize(8).fillColor('#94A3B8').text('Confidential HR Evaluation Record', 220, 770);
+
+    doc.end();
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 3. Performance Risk & PIP Intervention Report PDF
+router.get('/pdf/performance-risk', async (req, res) => {
+  try {
+    const atRisk = await Employee.find({
+      userId: req.userId,
+      riskLevel: { $in: ['Critical', 'High', 'Medium'] }
+    }).sort({ riskLevel: 1, performanceScore: 1 }).lean();
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="workforce_risk_intervention_report.pdf"');
+    doc.pipe(res);
+
+    // Header
+    doc.rect(40, 40, 515, 55).fill('#7F1D1D'); // Crimson
+    doc.fillColor('#FFFFFF').fontSize(16).text('WORKFORCE RISK & PIP INTERVENTION REPORT', 55, 50, { bold: true });
+    doc.fontSize(10).fillColor('#FECACA').text(`Actionable Underperformance Audit | ${atRisk.length} Employees Requiring Managerial Review`, 55, 72);
+
+    doc.fillColor('#0F172A').fontSize(11).text('Underperforming Employees Prioritization Matrix', 40, 115, { bold: true });
+    doc.rect(40, 130, 515, 1).fill('#E2E8F0');
+
+    // Table Header
+    doc.rect(40, 140, 515, 20).fill('#1E293B');
+    doc.fillColor('#FFFFFF').fontSize(8);
+    doc.text('ID', 45, 146, { width: 50 });
+    doc.text('EMPLOYEE', 100, 146, { width: 110 });
+    doc.text('DEPT', 215, 146, { width: 75 });
+    doc.text('PRIORITY', 295, 146, { width: 60 });
+    doc.text('PERF.', 360, 146, { width: 40 });
+    doc.text('ATTN.', 405, 146, { width: 40 });
+    doc.text('RECOMMENDED INTERVENTION', 450, 146, { width: 100 });
+
+    let tableY = 160;
+    atRisk.forEach((emp, i) => {
+      const bg = i % 2 === 0 ? '#FFFFFF' : '#FFF1F2';
+      doc.rect(40, tableY, 515, 22).fill(bg);
+      doc.fillColor('#0F172A').fontSize(8);
+      doc.text(emp.employeeId, 45, tableY + 6, { width: 50 });
+      doc.text(emp.employeeName, 100, tableY + 6, { width: 110 });
+      doc.text(emp.department, 215, tableY + 6, { width: 75 });
+
+      const pColor = emp.riskLevel === 'Critical' ? '#DC2626' : emp.riskLevel === 'High' ? '#EA580C' : '#D97706';
+      doc.fillColor(pColor).text(emp.riskLevel, 295, tableY + 6, { width: 60, bold: true });
+
+      doc.fillColor('#0F172A').text(`${emp.performanceScore}%`, 360, tableY + 6, { width: 40 });
+      doc.text(`${emp.attendancePercentage}%`, 405, tableY + 6, { width: 40 });
+
+      let action = '1-on-1 Check-in';
+      if (emp.riskLevel === 'Critical') action = 'Formal 30-Day PIP';
+      else if (emp.riskLevel === 'High') action = 'Bi-weekly Retraining';
+      doc.text(action, 450, tableY + 6, { width: 100 });
+
+      tableY += 22;
+      if (tableY > 720) {
+        doc.addPage();
+        tableY = 40;
+      }
+    });
 
     doc.end();
   } catch (error) {

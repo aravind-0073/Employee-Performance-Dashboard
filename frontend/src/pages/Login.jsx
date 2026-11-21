@@ -1,20 +1,41 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { Sun, Moon, GraduationCap, Mail, Lock, User, Eye, EyeOff, ArrowRight, Sparkles } from 'lucide-react';
+import {
+  Briefcase,
+  Mail,
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  Sparkles,
+  Building
+} from 'lucide-react';
 
 export default function Login() {
-  const [isDark, setIsDark] = useState(true);
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@workforce.io');
+  const [password, setPassword] = useState('Admin@123');
+  const [organization, setOrganization] = useState('Nexus Global Enterprises');
+  const [role, setRole] = useState('HR Administrator');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
   const { login, register } = useAuth();
   const navigate = useNavigate();
+
+  const handleFillDemo = () => {
+    setIsRegister(false);
+    setEmail('admin@workforce.io');
+    setPassword('Admin@123');
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,11 +46,11 @@ export default function Login() {
       let result;
       if (isRegister) {
         if (!name.trim()) {
-          setError('Name is required');
+          setError('Full Name is required');
           setLoading(false);
           return;
         }
-        result = await register(name, email, password);
+        result = await register(name, email, password, organization, role);
       } else {
         result = await login(email, password);
       }
@@ -37,228 +58,159 @@ export default function Login() {
       if (result.success) {
         navigate('/');
       } else {
-        setError(result.error || 'Something went wrong');
+        setError(result.error || 'Authentication failed');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
+      setError(err.response?.data?.error || 'Authentication error. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className={`min-h-screen flex relative transition-colors duration-500`} style={{ background: isDark ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f8fafc 100%)' }}>
-      
-      {/* Theme Toggle */}
-      <div className="absolute top-6 right-6 z-50">
-        <button
-          onClick={() => setIsDark(!isDark)}
-          className={`p-3 rounded-full transition-colors shadow-lg ${isDark ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}`}
-        >
-          {isDark ? <Sun size={20} /> : <Moon size={20} />}
-        </button>
-      </div>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 font-sans text-slate-100 relative overflow-hidden">
+      {/* Background Subtle Gradient Blobs */}
+      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Left Panel — Branding */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-center items-center p-16 relative overflow-hidden">
-        {/* Animated background circles perfectly centered behind branding */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className={`absolute w-[600px] h-[600px] rounded-full blur-2xl ${isDark ? 'opacity-20' : 'opacity-[0.08]'}`} style={{ background: 'radial-gradient(circle, #8b5cf6 0%, transparent 60%)' }} />
-          <div className={`absolute w-[400px] h-[400px] rounded-full blur-xl ${isDark ? 'opacity-20' : 'opacity-[0.05]'}`} style={{ background: 'radial-gradient(circle, #06b6d4 0%, transparent 60%)' }} />
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 relative z-10"
+      >
+        {/* Logo and Brand */}
+        <div className="text-center space-y-2">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 mx-auto flex items-center justify-center shadow-lg shadow-indigo-600/25">
+            <Briefcase className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex items-center justify-center gap-1.5 pt-1">
+            <h1 className="text-xl font-bold tracking-tight text-white">Workforce</h1>
+            <span className="text-xs font-black px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">AI</span>
+          </div>
+          <p className="text-xs text-slate-400">
+            Enterprise Workforce Performance & Predictive Analytics
+          </p>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="relative z-10 text-center flex flex-col items-center"
-        >
-          <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-8 shadow-2xl" style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}>
-            <GraduationCap size={40} className="text-white drop-shadow-md" />
+        {/* Quick Demo Access Bar */}
+        <div className="p-3 bg-indigo-950/40 border border-indigo-800/50 rounded-2xl flex items-center justify-between text-xs">
+          <div className="space-y-0.5">
+            <span className="font-bold text-indigo-300 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              Demo Admin Account
+            </span>
+            <span className="text-[10px] text-slate-400 block font-mono">admin@workforce.io / Admin@123</span>
           </div>
-          <h1 className={`text-5xl font-extrabold mb-4 tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            Student<span style={{ color: '#06b6d4' }}>Hub</span>
-          </h1>
-          <p className={`text-lg max-w-md leading-relaxed font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            Advanced Student Performance Analytics Platform for Universities
-          </p>
+          <button
+            type="button"
+            onClick={handleFillDemo}
+            className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors cursor-pointer"
+          >
+            Use Demo
+          </button>
+        </div>
 
-          <div className="mt-12 grid grid-cols-3 gap-6">
-            {[
-              { label: 'ML Analytics', value: '8+' },
-              { label: 'Report Types', value: '6' },
-              { label: 'Real-time KPIs', value: '9' },
-            ].map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + i * 0.1 }}
-                className="text-center"
-              >
-                <p className="text-3xl font-extrabold" style={{ color: isDark ? '#22d3ee' : '#0284c7' }}>{stat.value}</p>
-                <p className={`text-xs mt-1 uppercase tracking-wider font-bold ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>{stat.label}</p>
-              </motion.div>
-            ))}
+        {error && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
+            {error}
           </div>
-        </motion.div>
-      </div>
+        )}
 
-      {/* Right Panel — Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <motion.div
-          initial={{ opacity: 0, x: 30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md"
-        >
-          {/* Mobile logo */}
-          <div className="lg:hidden text-center mb-8">
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}>
-              <GraduationCap size={28} className="text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white">StudentHub</h1>
-          </div>
-
-          {/* Form Card */}
-          <div className={`${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200'} backdrop-blur-xl border rounded-2xl p-8 shadow-2xl`}>
-            <div className="mb-6">
-              <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {isRegister ? 'Create Account' : 'Welcome Back'}
-              </h2>
-              <p className={`mt-1 text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
-                {isRegister ? 'Sign up to get your own analytics workspace' : 'Sign in to your analytics dashboard'}
-              </p>
-            </div>
-
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-3 rounded-lg text-sm font-medium"
-                style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}
-              >
-                {error}
-              </motion.div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {isRegister && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Full Name</label>
-                  <div className="relative">
-                    <User size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="John Doe"
-                      className={`w-full pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all font-medium ${
-                        isDark ? 'text-white placeholder-slate-400 bg-white/5 border-white/10' : 'text-slate-900 placeholder-slate-400 bg-slate-50 border-slate-200'
-                      }`}
-                      style={{ border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0' }}
-                    />
-                  </div>
-                </motion.div>
-              )}
-
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          {isRegister && (
+            <>
               <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Email</label>
+                <label className="block text-slate-400 font-semibold mb-1">Full Name</label>
                 <div className="relative">
-                  <Mail size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@university.edu"
+                    type="text"
                     required
-                    className={`w-full pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all font-medium ${
-                      isDark ? 'text-white placeholder-slate-400 bg-white/5 border-white/10' : 'text-slate-900 placeholder-slate-400 bg-slate-50 border-slate-200'
-                    }`}
-                    style={{ border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0' }}
+                    placeholder="e.g. Alex Morgan"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-hidden focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Password</label>
+                <label className="block text-slate-400 font-semibold mb-1">Organization Name</label>
                 <div className="relative">
-                  <Lock size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+                  <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    minLength={6}
-                    className={`w-full pl-10 pr-12 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all font-medium ${
-                      isDark ? 'text-white placeholder-slate-400 bg-white/5 border-white/10' : 'text-slate-900 placeholder-slate-400 bg-slate-50 border-slate-200'
-                    }`}
-                    style={{ border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0' }}
+                    type="text"
+                    placeholder="e.g. Acme Corp"
+                    value={organization}
+                    onChange={(e) => setOrganization(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-hidden focus:border-indigo-500"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
                 </div>
               </div>
+            </>
+          )}
 
+          <div>
+            <label className="block text-slate-400 font-semibold mb-1">Corporate Email Address</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="email"
+                required
+                placeholder="name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-hidden focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-400 font-semibold mb-1">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-hidden focus:border-indigo-500"
+              />
               <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 hover:shadow-lg hover:shadow-cyan-500/25"
-                style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
               >
-                {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    {isRegister ? 'Create Account' : 'Sign In'}
-                    <ArrowRight size={16} />
-                  </>
-                )}
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                {isRegister ? 'Already have an account?' : "Don't have an account?"}
-                <button
-                  type="button"
-                  onClick={() => { setIsRegister(!isRegister); setError(''); }}
-                  className={`ml-1 font-bold transition-colors ${isDark ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-600 hover:text-cyan-700'}`}
-                >
-                  {isRegister ? 'Sign In' : 'Sign Up'}
-                </button>
-              </p>
             </div>
-
-            {isRegister && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="mt-4 flex items-center gap-2 p-3 rounded-lg"
-                style={{ 
-                  background: isDark ? 'rgba(6, 182, 212, 0.1)' : 'rgba(6, 182, 212, 0.05)', 
-                  border: isDark ? '1px solid rgba(6, 182, 212, 0.2)' : '1px solid rgba(6, 182, 212, 0.2)'
-                }}
-              >
-                <Sparkles size={14} className={isDark ? "text-cyan-400 flex-shrink-0" : "text-cyan-600 flex-shrink-0"} style={{ color: isDark ? '#22d3ee' : '#0284c7' }} />
-                <p className="text-xs font-semibold" style={{ color: isDark ? '#cffafe' : '#164e63' }}>
-                  New accounts start with a demo dataset of 300 students. You can replace it with your own data anytime.
-                </p>
-              </motion.div>
-            )}
           </div>
-        </motion.div>
-      </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2.5 mt-2 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            <span>{loading ? 'Authenticating...' : isRegister ? 'Create Organization Account' : 'Sign In to Workspace'}</span>
+            <ArrowRight size={14} />
+          </button>
+        </form>
+
+        <div className="pt-2 text-center text-xs text-slate-400">
+          <span>{isRegister ? 'Already registered?' : 'Need a new tenant workspace?'} </span>
+          <button
+            type="button"
+            onClick={() => {
+              setIsRegister(!isRegister);
+              setError('');
+            }}
+            className="font-bold text-indigo-400 hover:underline cursor-pointer"
+          >
+            {isRegister ? 'Sign In Here' : 'Create Account'}
+          </button>
+        </div>
+      </motion.div>
     </div>
   );
 }

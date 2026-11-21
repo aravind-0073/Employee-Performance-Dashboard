@@ -1,400 +1,195 @@
-# Student Performance Analysis Dashboard
+# Employee Performance Analysis & Management Dashboard
 
-A comprehensive university-level Student Performance Analysis Dashboard for monitoring academic performance, attendance tracking, and automated detention student identification.
+An enterprise-grade workforce monitoring, predictive analytics, and underperformance risk management platform built on a decoupled 3-tier microservices architecture. It combines a modern React 18 frontend with a Node.js Express API gateway, MongoDB database, and a high-performance Python FastAPI data science and machine learning engine.
 
-## 🌟 Features
+---
 
-### Core Functionalities
+## 🏗️ System Architecture & Data Flow
 
-✅ **Student Data Management**
-- Upload student data via Excel/CSV
-- Automatic data validation and parsing
-- CRUD operations for student records
-- Search and filter capabilities
-
-✅ **Dashboard Analytics**
-- Real-time KPI metrics (total students, average GPA, attendance)
-- Interactive charts and visualizations
-- Department and semester comparisons
-- Performance trend analysis
-
-✅ **Student Performance Tracking**
-- Individual student profiles
-- Subject-wise marks analysis
-- Attendance percentage tracking
-- GPA/CGPA management
-- Academic status determination
-
-✅ **Automated Detention System**
-- Automatic identification of detained students (attendance < 75%)
-- Detention reason tracking
-- Risk student alerts
-- Attendance warning system
-
-✅ **Advanced Analytics**
-- Attendance distribution analysis
-- GPA distribution charts
-- Subject performance comparison
-- Top and weak performers
-- Department-wise analytics
-
-✅ **Export & Reports**
-- Export student data to Excel
-- Generate detention lists (Excel/PDF)
-- Comprehensive reports
-- Professional documentation
-
-✅ **User Interface**
-- Modern, responsive design
-- Dark/Light theme ready
-- Smooth animations
-- Mobile-friendly layout
-- Professional admin dashboard
-
-## 🛠️ Tech Stack
-
-### Frontend
-- **React.js 18** with Vite
-- **Tailwind CSS** for styling
-- **Recharts** for data visualization
-- **Framer Motion** for animations
-- **React Router** for navigation
-- **Axios** for API communication
-
-### Backend
-- **Node.js + Express.js**
-- **MongoDB** for data storage
-- **Multer** for file uploads
-- **XLSX** for Excel parsing
-- **ExcelJS** for Excel export
-- **PDFKit** for PDF generation
-
-### Database
-- **MongoDB Atlas** (recommended for production)
-- **MongoDB Local** (for development)
-
-## 📋 Project Structure
-
-```
-student-dashboard/
-├── frontend/                 # React application
-│   ├── src/
-│   │   ├── components/      # Reusable React components
-│   │   ├── pages/           # Page components
-│   │   ├── services/        # API service
-│   │   └── App.jsx
-│   ├── package.json
-│   ├── vite.config.js
-│   └── README.md
-│
-├── backend/                  # Express.js API
-│   ├── models/              # MongoDB models
-│   ├── routes/              # API routes
-│   ├── scripts/             # Utility scripts
-│   ├── server.js
-│   ├── package.json
-│   └── README.md
-│
-└── README.md                 # This file
+```text
+                 ┌─────────────────────────────────────┐
+                 │       React 18 + Vite Frontend      │
+                 │    (Port 3000: Tailwind, Recharts)   │
+                 └──────────────────┬──────────────────┘
+                                    │
+                             HTTP / REST (JWT)
+                                    │
+                 ┌──────────────────▼──────────────────┐
+                 │     Node.js / Express Gateway      │
+                 │     (Port 5000: Auth, CRUD, Export)│
+                 └───────────┬──────────────────┬─────┘
+                             │                  │
+                   Mongoose Queries     HTTP Inter-Service
+                             │                  │
+                             ▼                  ▼
+                  ┌────────────────┐  ┌─────────────────────┐
+                  │ MongoDB Engine │  │ Python FastAPI      │
+                  │ (Port 27017)   │  │ Analytics Engine    │
+                  │ Workforce DB   │  │ (Port 8000)         │
+                  └────────────────┘  └─────────────────────┘
 ```
 
-## 🚀 Quick Start
+1. **Auto-Service Orchestration:** When the Node.js backend starts (`server.js`), it performs a health check on `http://localhost:8000/health`. If the Python FastAPI service is offline, Node.js automatically spawns the Python virtual environment process as a managed child process.
+2. **Multi-Tenancy & Data Isolation:** Each employee record is indexed to a specific authenticated organization or administrator (`userId`). All queries, uploads, analytics computations, and report exports are strictly scoped to the authenticated user.
+3. **Managed Database Resilience:** Automatically connects to local MongoDB or MongoDB Atlas; if neither is detected in development, it boots an in-process managed `MongoMemoryServer` engine with auto-seeding.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technologies & Libraries |
+|---|---|
+| **Frontend** | React 18, Vite 5, Tailwind CSS 3.4, Recharts, Framer Motion, Lucide React, Axios, React Router DOM v6, React Toastify |
+| **Backend Gateway** | Node.js (ESM), Express.js 4.18, Mongoose ODM, Multer, xlsx (SheetJS), ExcelJS, PDFKit, bcryptjs, JSON Web Tokens (JWT) |
+| **Analytics & ML Service** | Python 3.9+, FastAPI, Uvicorn, Pandas, NumPy, Scikit-learn (Linear Regression), SciPy (pearsonr), Pydantic |
+| **Database** | MongoDB with compound indexing on `(userId, employeeId)` and `(userId, department, designation)` |
+
+---
+
+## 🧩 Core Modules & Functionalities
+
+### 1. 🔐 Authentication & Multi-Tenancy
+- **Secure Access:** Signup and login using hashed passwords (`bcryptjs`, 12 rounds) and signed JWT tokens with 7-day expiration.
+- **Axios Interceptors:** Automatic token injection in HTTP headers with automated 401 redirection to `/login`.
+- **Private Workspaces:** Every organization or administrator manages its own isolated employee dataset without cross-tenant interference.
+- **Default Demo Credentials:**
+  - **Email:** `admin@workforce.io`
+  - **Password:** `Admin@123`
+
+### 2. 📁 Employee Data Ingestion & Dataset Management (`/upload`)
+- **File Ingestion:** Drag-and-drop parsing for `.xlsx`, `.xls`, and `.csv` files via Multer and SheetJS (`xlsx`).
+- **Schema Validation:** Verifies required headers:
+  - `EmployeeID`, `EmployeeName`, `Department`, `Designation`, `Experience`, `AttendancePercentage`, `PerformanceScore`, `ProductivityScore`
+- **Optional Supported Headers:**
+  - `Salary`, `JoiningDate`, `ProjectsCompleted`, `TasksCompleted`, `TargetCompletionRate`, `ManagerName`, `Skills`, `TrainingHours`, `QualityScore`, `Email`, `Phone`
+- **Flexible Modes:** Option to append/update records or completely overwrite existing datasets.
+- **Sample Templates:** One-click download for both Excel (`.xlsx`) and CSV (`.csv`) pre-formatted templates.
+
+### 3. 📊 Real-Time KPI Dashboard (`/`)
+- **Executive Metrics:** Total Headcount, Average Performance Score, Average Attendance Rate, Overall Productivity, Target Achievement Rate, High Performers Count, and Underperforming Employees Count.
+- **Dynamic AI / Statistical Insights Cards:**
+  - Pearson correlation test between Attendance and Performance Score (r and p-value).
+  - Pearson correlation test between Productivity and Performance.
+  - Best and lowest-performing departments with composite efficiency scores.
+  - Departmental productivity drop alerts (&gt;5 pts below company average).
+  - Identification of talent pool opportunities and underperformance warnings.
+- **Interactive Visualizations:**
+  - Performance Distribution Histogram (Poor &lt;50 to Excellent 85-100).
+  - Employee Performance Index (EPI) Ratio Donut Chart.
+  - Department-Level Comparative Bar Chart (Performance vs Productivity vs Attendance).
+  - Attendance Distribution Bar Chart (&lt;75% deficit detection).
+  - Top 10 High Performers and Bottom 10 Underperformers Leaderboards.
+
+### 4. 👨‍💼 Employee Directory & Deep Analytics (`/employees` & `/employees/:employeeId`)
+- **Search & Filters:** Search by ID or Name; filter by Department, Designation, Experience, Performance Category, and Risk Level.
+- **Employee CRUD:** Add new employee modal, inline editing, and deletion.
+- **Individual Employee Profiles:**
+  - 5-Axis Performance Radar Chart: Productivity, Quality, Attendance, Target Achievement, Task Velocity.
+  - **Employee Performance Index (EPI):** Weighted composite metric (0–100):
+    $$\text{EPI} = (30\% \times \text{Productivity}) + (25\% \times \text{Quality}) + (20\% \times \text{Attendance}) + (15\% \times \text{TargetAchievement}) + (10\% \times \text{TaskCompletion})$$
+  - **Machine Learning Predictive Engine:** Uses Scikit-learn Linear Regression to forecast expected employee performance from peer operational inputs, identifying positive or negative performance trends.
+  - **Personalized Recommendations:** Dynamic strengths, weaknesses, and actionable coaching recommendations.
+  - **Intervention Logger:** Audit trail to log PIPs, manager reviews, and technical training.
+
+### 5. ⚠️ Automated Underperformance & Risk Management (`/performance-risks`)
+- **Threshold Sensitivity Sliders:** Configurable organizational cutoffs for Performance, Attendance, and Productivity.
+- **Multi-Factor Risk Scoring:** Evaluates attendance deficits (&lt;75%), productivity drops, low target completion, and deliverable quality.
+- **Priority Matrix:** Categorizes employees into Critical, High, Medium, or Low priority.
+- **Actionable Interventions:** Automated assignment of 30-Day PIPs, 1-on-1 manager alignment, workload rebalancing, and technical training.
+
+### 6. 🏢 Departmental Benchmarking & Ranking (`/departments`)
+- **Multi-Criteria Ranking Formula:**
+  $$\text{Department Score} = (40\% \times \text{Performance}) + (30\% \times \text{Productivity}) + (20\% \times \text{Attendance}) + (10\% \times \text{TargetAchievement})$$
+- Department comparison cards, rankings (1..N), comparative charts, and department rosters.
+
+### 7. 📄 Export & Reporting Center (`/reports`)
+- **Excel Spreadsheets (`.xlsx` via `exceljs`):**
+  1. Complete workforce database
+  2. Performance summary & EPI ratings
+  3. Underperforming employees & risk audit
+  4. Departmental benchmarking & rankings
+  5. High-performing talent pool
+- **PDF Documentation (`PDFKit`):**
+  1. Executive Workforce Performance Report
+  2. Individual Employee Performance Appraisal Document
+  3. Workforce Risk & PIP Intervention Report
+
+---
+
+## 🚀 Quick Start Guide
 
 ### Prerequisites
-- Node.js (v16+)
-- npm or yarn
-- MongoDB (local or MongoDB Atlas)
-- Git
+- Node.js (v18+)
+- Python (3.9+)
+- MongoDB (Local daemon or MongoDB Atlas)
 
-### 1. Clone the Repository
-```bash
-git clone <repository-url>
-cd student-dashboard
-```
+### 1. Backend & Analytics Auto-Start
 
-### 2. Setup Backend
+The Node.js backend includes auto-orchestration. When started, it automatically checks and launches the Python FastAPI analytics service:
 
 ```bash
 cd backend
 npm install
-cp .env.example .env
-```
-
-Configure `.env`:
-```env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/student-dashboard
-NODE_ENV=development
-```
-
-Start backend:
-```bash
 npm run dev
 ```
 
-Seed sample data:
+- API Gateway runs on `http://localhost:5000`
+- Python Analytics microservice automatically spawns on `http://localhost:8000`
+- Default admin account `admin@workforce.io` (`Admin@123`) is seeded with 60 realistic employee records.
+
+### 2. Standalone Analytics Service (Manual Run Option)
+
 ```bash
-node scripts/seedDatabase.js
+cd analytics
+python -m venv venv
+venv\Scripts\activate      # On Windows
+# source venv/bin/activate # On macOS/Linux
+pip install -r requirements.txt
+python main.py
 ```
 
-### 3. Setup Frontend
+Runs on `http://localhost:8000` (Swagger docs available at `http://localhost:8000/docs`).
+
+### 3. Frontend Web Application
 
 ```bash
-cd ../frontend
+cd frontend
 npm install
 npm run dev
 ```
 
-Open browser: `http://localhost:3000`
-
-## 📊 Sample Data
-
-The project includes a sample data generator that creates:
-- 300+ students across 5 departments
-- 8 semesters with mixed performance
-- Various attendance percentages
-- Automatically flagged detained students
-- Realistic GPA distribution
-
-Generate sample data:
-```bash
-node backend/scripts/seedDatabase.js
-```
-
-## 📱 User Guide
-
-### 1. Dashboard
-- View real-time KPIs
-- Monitor overall performance
-- Check attendance and GPA distribution
-- Filter by department
-
-### 2. Student Management
-- Browse all students
-- Search by USN or name
-- View individual profiles
-- Check subject-wise performance
-
-### 3. Department Analytics
-- Compare departments
-- Analyze semester trends
-- Identify high/low performers
-- Track detention rates
-
-### 4. Detention Management
-- View all detained students (attendance < 75%)
-- Contact information for parents
-- Detention reasons
-- Export lists for counseling
-
-### 5. Data Upload
-- Upload Excel/CSV files
-- Automatic data processing
-- Error reporting
-- Clear data option
-
-### 6. Reports
-- Export all students
-- Generate detention reports
-- PDF/Excel formats
-- Department filtering
-
-## 🔌 API Endpoints
-
-### Students
-```
-GET    /api/students                 # Get all students
-GET    /api/students/:usn            # Get single student
-POST   /api/students                 # Create student
-PUT    /api/students/:usn            # Update student
-DELETE /api/students/:usn            # Delete student
-POST   /api/students/search          # Search students
-GET    /api/students/detained/list   # Get detained students
-```
-
-### Analytics
-```
-GET    /api/analytics/kpi                        # KPI metrics
-GET    /api/analytics/attendance-distribution    # Attendance stats
-GET    /api/analytics/subject-performance        # Subject averages
-GET    /api/analytics/gpa-distribution           # GPA distribution
-GET    /api/analytics/department-comparison      # Department stats
-GET    /api/analytics/semester-comparison        # Semester stats
-GET    /api/analytics/top-performers             # Top 10 students
-GET    /api/analytics/weak-performers            # Bottom 10 students
-GET    /api/analytics/detained-analysis          # Detained analysis
-GET    /api/analytics/risk-students              # Risk students
-```
-
-### File Upload
-```
-POST   /api/upload                   # Upload file
-DELETE /api/upload/all/data          # Clear all data
-```
-
-### Export
-```
-GET    /api/export/detained-excel    # Detained students (Excel)
-GET    /api/export/detained-pdf      # Detained students (PDF)
-GET    /api/export/all-students-excel # All students (Excel)
-```
-
-## 🎨 Design Features
-
-- **Color Scheme**: Navy, Cyan, Purple
-- **Responsive**: Desktop, Tablet, Mobile
-- **Animations**: Smooth transitions and hover effects
-- **Icons**: Lucide React icons
-- **Charts**: Recharts for visualizations
-- **Typography**: Professional sans-serif fonts
-
-## 🔒 Security Considerations
-
-- Environment variables for sensitive data
-- CORS configuration
-- Input validation
-- MongoDB injection prevention
-- File upload restrictions
-- Error handling
-
-**For production, add:**
-- JWT authentication
-- Rate limiting
-- HTTPS/SSL
-- Database backup
-- Logging system
-
-## 📈 Performance Metrics
-
-- Load Time: < 2 seconds
-- API Response: < 500ms
-- Database Query: < 100ms
-- Chart Rendering: < 1 second
-- File Upload: Up to 50MB
-
-## 🐛 Troubleshooting
-
-### Backend Issues
-
-**MongoDB Connection Error**
-```bash
-# Check if MongoDB is running
-mongod
-# Or use MongoDB Atlas connection string
-```
-
-**Port Already in Use**
-```bash
-# Change PORT in .env
-# Or kill process: lsof -i :5000
-```
-
-**Seed Data Failed**
-```bash
-# Ensure MongoDB is running
-# Check connection string in .env
-```
-
-### Frontend Issues
-
-**API Connection Error**
-- Ensure backend is running
-- Check VITE_API_URL configuration
-- Verify CORS settings
-
-**Vite Port Conflict**
-- Change port in vite.config.js
-- Or use: `npm run dev -- --port 3001`
-
-**Module Not Found**
-```bash
-npm cache clean --force
-rm -rf node_modules
-npm install
-```
-
-## 📚 File Upload Format
-
-### Required Columns
-| Column | Type | Description |
-|--------|------|-------------|
-| USN | String | Unique Student Number |
-| StudentName | String | Full student name |
-| Department | String | Department name |
-| Semester | Number | Current semester (1-8) |
-| Section | String | Class section (A, B, C) |
-| AttendancePercentage | Number | Attendance % (0-100) |
-
-### Optional Columns
-- Subject1-5Marks (0-100)
-- InternalMarks (0-50)
-- GPA/CGPA (0-10)
-- Email, Phone
-- ParentName, ParentPhone
-- CounselorName
-
-## 🚢 Deployment
-
-### Frontend Deployment (Vercel)
-```bash
-npm run build
-vercel --prod
-```
-
-### Backend Deployment (Render/Railway)
-1. Push to GitHub
-2. Connect repository
-3. Set environment variables
-4. Deploy
-
-### Database (MongoDB Atlas)
-1. Create cluster
-2. Get connection string
-3. Add to .env
-
-## 📖 Additional Documentation
-
-- [Backend README](./backend/README.md) - Detailed backend setup
-- [Frontend README](./frontend/README.md) - Detailed frontend setup
-
-## 👥 Team & Support
-
-For issues and questions:
-- Check documentation
-- Review error messages
-- Check API responses
-- Review browser console
-
-## 📄 License
-
-MIT License - Feel free to use for academic and commercial purposes.
-
-## ✨ Features Roadmap
-
-Future enhancements:
-- ✅ AI-based risk prediction
-- ✅ Email notifications
-- ✅ Advanced analytics
-- ✅ Multi-user authentication
-- ✅ Real-time dashboard
-- ✅ Mobile app
-- ✅ Custom report builder
-- ✅ Data visualization dashboards
-
-## 🎓 Perfect For
-
-- University administration
-- Academic departments
-- Faculty dashboards
-- Institutional reporting
-- Student counseling
-- Academic planning
-- Performance monitoring
+Runs on `http://localhost:3000`.
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: May 2026  
-**Status**: Production Ready ✅
+## ⚙️ Environment Variables
 
-**Ready to transform your student management? Get started now! 🚀**
+### `backend/.env`
+```env
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/employee-dashboard
+NODE_ENV=development
+ANALYTICS_SERVICE_URL=http://localhost:8000
+JWT_SECRET=supersecret_workforce_jwt_key_2026
+```
+
+### `analytics/.env`
+```env
+ANALYTICS_PORT=8000
+ENVIRONMENT=development
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5000
+ENABLE_PREDICTIONS=true
+```
+
+---
+
+## 🧪 Testing the Complete Pipeline
+
+1. Open `http://localhost:3000/login` in your browser.
+2. Click **"Use Demo"** or enter `admin@workforce.io` / `Admin@123`.
+3. View the **Executive Dashboard**: inspect the 7 KPI cards, the dynamic AI insights cards with Pearson correlations, and the interactive charts.
+4. Navigate to **Employee Directory**: search, filter by department or risk level, click on any employee to view their individual profile, 5-axis radar chart, and Scikit-learn ML performance prediction.
+5. Navigate to **Performance Risks**: test the threshold sliders to observe real-time priority matrix updates and log an HR intervention.
+6. Navigate to **Department Benchmarking**: observe multi-criteria rankings and individual department rosters.
+7. Navigate to **Dataset Ingestion**: download sample `.xlsx` or `.csv` templates and test uploading files in append or overwrite mode.
+8. Navigate to **Export & Reports**: download both formatted Excel spreadsheets and formal PDF dossiers.
