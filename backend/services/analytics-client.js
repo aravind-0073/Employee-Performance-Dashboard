@@ -7,7 +7,7 @@ const ANALYTICS_BASE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://localhos
 
 const client = axios.create({
   baseURL: ANALYTICS_BASE_URL,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -20,7 +20,12 @@ export const analyticsAPI = {
   departments: (employees) => client.post('/api/analytics/departments/benchmark', { employees }),
   predict: (employee, peers = []) => client.post('/api/analytics/predictions/predict', { employee, peers }),
   deepDive: (employeeId, employees) => client.post(`/api/analytics/performance/deep-dive/${employeeId}`, { employees }),
-  risks: (employees, thresholds = null) => client.post('/api/analytics/risks/assessment', { employees, thresholds })
+  risks: (employees, thresholds = null) => client.post('/api/analytics/risks/assessment', { employees, thresholds }),
+
+  // Academic Data Mining & Machine Learning
+  trainEvaluate: (employees) => client.post('/api/analytics/ml/train-evaluate', { employees }),
+  predictML: (payload) => client.post('/api/analytics/ml/predict', payload),
+  edaVisualizations: (employees) => client.post('/api/analytics/ml/eda-visualizations', { employees })
 };
 
 export async function healthCheck() {
@@ -32,7 +37,6 @@ export async function healthCheck() {
   }
 }
 
-// Resilient wrapper with local in-process fallback if Python service is offline
 export async function withPythonFallback(apiCall, fallbackFn) {
   try {
     const res = await apiCall;

@@ -5,6 +5,7 @@ import {
   Users2,
   Building2,
   ShieldAlert,
+  BrainCircuit,
   UploadCloud,
   FileSpreadsheet,
   LogOut,
@@ -25,7 +26,6 @@ export default function Layout() {
   const { user, logout } = useAuth();
 
   useEffect(() => {
-    // Periodic light health probe
     analyticsAPI.getHealth()
       .then(res => setEngineHealthy(res.data?.success || res.data?.status === 'healthy'))
       .catch(() => setEngineHealthy(false));
@@ -34,6 +34,7 @@ export default function Layout() {
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Executive Dashboard' },
     { path: '/employees', icon: Users2, label: 'Employee Directory' },
+    { path: '/ml-analytics', icon: BrainCircuit, label: 'Data Mining & ML' },
     { path: '/departments', icon: Building2, label: 'Dept. Benchmarking' },
     { path: '/performance-risks', icon: ShieldAlert, label: 'Performance Risks' },
     { path: '/upload', icon: UploadCloud, label: 'Dataset Ingestion' },
@@ -70,7 +71,7 @@ export default function Layout() {
                   <span className="text-xs font-black px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">AI</span>
                 </div>
                 <p className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 -mt-0.5">
-                  HR Analytics Platform
+                  Data Mining & ML Engine
                 </p>
               </motion.div>
             )}
@@ -112,12 +113,12 @@ export default function Layout() {
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 font-medium">
                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                Python ML Engine
+                Scikit-learn ML Engine
               </span>
               <span className={`w-2 h-2 rounded-full ${engineHealthy ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
             </div>
             <p className="mt-1 text-[10px] text-slate-500">
-              Port 8000 &bull; {engineHealthy ? 'Linear Regr. Online' : 'Starting/Offline'}
+              Port 8000 &bull; DT, RF & Logistic Ready
             </p>
           </div>
         )}
@@ -157,7 +158,7 @@ export default function Layout() {
             </span>
             <span className="text-slate-300 dark:text-slate-700">&bull;</span>
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Multi-Tenant HR Performance & ML Suite
+              Data Mining & Machine Learning Academic Platform
             </span>
           </div>
 

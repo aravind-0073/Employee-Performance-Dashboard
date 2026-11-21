@@ -10,16 +10,15 @@ from routes import (
     statistics,
     departments,
     predictions,
-    risks
+    risks,
+    ml
 )
 
 app = FastAPI(
     title="Workforce Analytics & ML Engine",
-    description="Python FastAPI microservice for employee performance evaluation, risk assessment, and predictive analytics",
-    version="2.0.0"
+    description="Python FastAPI microservice for employee performance evaluation, risk assessment, and predictive machine learning models",
+    version="2.1.0"
 )
-
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5000").split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,14 +34,14 @@ app.include_router(statistics.router, prefix="/api/analytics")
 app.include_router(departments.router, prefix="/api/analytics")
 app.include_router(predictions.router, prefix="/api/analytics")
 app.include_router(risks.router, prefix="/api/analytics")
+app.include_router(ml.router, prefix="/api/analytics")
 
 @app.get("/health")
 async def health_check():
-    """Service health check endpoint used by Node.js auto-orchestration"""
     return {
         "status": "healthy",
         "service": "Workforce Analytics & ML Engine",
-        "version": "2.0.0"
+        "version": "2.1.0"
     }
 
 @app.get("/")

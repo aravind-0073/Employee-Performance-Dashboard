@@ -5,10 +5,9 @@ import Employee, { calculateEmployeeMetrics } from '../models/Employee.js';
 
 const router = express.Router();
 
-// Memory storage for fast parsing
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB max
+  limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const validExts = ['.xlsx', '.xls', '.csv'];
     const isMatch = validExts.some(ext => file.originalname.toLowerCase().endsWith(ext));
@@ -17,7 +16,6 @@ const upload = multer({
   }
 });
 
-// Helper to normalize header keys (case-insensitive and trimmed)
 function normalizeKey(key) {
   return String(key).trim().toLowerCase().replace(/[\s_-]/g, '');
 }
@@ -33,7 +31,6 @@ const REQUIRED_HEADERS = [
   'productivityscore'
 ];
 
-// Sample dataset rows for template generation
 const SAMPLE_EMPLOYEES = [
   {
     EmployeeID: 'EMP001',
@@ -42,8 +39,13 @@ const SAMPLE_EMPLOYEES = [
     Designation: 'Senior Software Engineer',
     Experience: 6.5,
     AttendancePercentage: 96.5,
-    PerformanceScore: 92.0,
+    WorkingHours: 45.0,
+    TrainingHours: 42.0,
+    JobSatisfaction: 4.8,
+    Workload: 3.5,
+    PreviousPerformanceRating: 4.6,
     ProductivityScore: 94.0,
+    PerformanceScore: 92.0,
     QualityScore: 91.5,
     TargetCompletionRate: 95.0,
     ProjectsCompleted: 14,
@@ -52,7 +54,6 @@ const SAMPLE_EMPLOYEES = [
     JoiningDate: '2020-03-15',
     ManagerName: 'David Vance',
     Skills: 'React, Node.js, Python, Architecture',
-    TrainingHours: 42,
     Email: 'sarah.jenkins@workforce.io',
     Phone: '+1 (555) 234-5678'
   },
@@ -63,8 +64,13 @@ const SAMPLE_EMPLOYEES = [
     Designation: 'Account Executive',
     Experience: 4.0,
     AttendancePercentage: 92.0,
-    PerformanceScore: 88.5,
+    WorkingHours: 44.0,
+    TrainingHours: 28.0,
+    JobSatisfaction: 4.5,
+    Workload: 3.2,
+    PreviousPerformanceRating: 4.2,
     ProductivityScore: 89.0,
+    PerformanceScore: 88.5,
     QualityScore: 86.0,
     TargetCompletionRate: 98.0,
     ProjectsCompleted: 9,
@@ -73,7 +79,6 @@ const SAMPLE_EMPLOYEES = [
     JoiningDate: '2021-06-01',
     ManagerName: 'Rachel Miller',
     Skills: 'B2B Sales, CRM, Negotiation',
-    TrainingHours: 28,
     Email: 'marcus.chen@workforce.io',
     Phone: '+1 (555) 345-6789'
   },
@@ -84,8 +89,13 @@ const SAMPLE_EMPLOYEES = [
     Designation: 'Marketing Lead',
     Experience: 5.0,
     AttendancePercentage: 88.0,
-    PerformanceScore: 78.0,
+    WorkingHours: 40.0,
+    TrainingHours: 20.0,
+    JobSatisfaction: 3.6,
+    Workload: 3.0,
+    PreviousPerformanceRating: 3.5,
     ProductivityScore: 79.5,
+    PerformanceScore: 78.0,
     QualityScore: 82.0,
     TargetCompletionRate: 85.0,
     ProjectsCompleted: 7,
@@ -94,7 +104,6 @@ const SAMPLE_EMPLOYEES = [
     JoiningDate: '2022-01-10',
     ManagerName: 'Rachel Miller',
     Skills: 'SEO, Content Strategy, Analytics',
-    TrainingHours: 20,
     Email: 'jessica.m@workforce.io',
     Phone: '+1 (555) 456-7890'
   },
@@ -105,8 +114,13 @@ const SAMPLE_EMPLOYEES = [
     Designation: 'Junior Developer',
     Experience: 1.5,
     AttendancePercentage: 72.0,
-    PerformanceScore: 54.0,
+    WorkingHours: 35.0,
+    TrainingHours: 12.0,
+    JobSatisfaction: 2.2,
+    Workload: 2.4,
+    PreviousPerformanceRating: 2.3,
     ProductivityScore: 58.0,
+    PerformanceScore: 54.0,
     QualityScore: 62.0,
     TargetCompletionRate: 60.0,
     ProjectsCompleted: 2,
@@ -115,13 +129,12 @@ const SAMPLE_EMPLOYEES = [
     JoiningDate: '2023-08-15',
     ManagerName: 'David Vance',
     Skills: 'JavaScript, HTML, CSS',
-    TrainingHours: 12,
     Email: 'alex.rivera@workforce.io',
     Phone: '+1 (555) 567-8901'
   }
 ];
 
-// GET /api/upload/template/excel - Download sample Excel template
+// GET /api/upload/template/excel
 router.get('/template/excel', (req, res) => {
   try {
     const ws = xlsx.utils.json_to_sheet(SAMPLE_EMPLOYEES);
@@ -137,7 +150,7 @@ router.get('/template/excel', (req, res) => {
   }
 });
 
-// GET /api/upload/template/csv - Download sample CSV template
+// GET /api/upload/template/csv
 router.get('/template/csv', (req, res) => {
   try {
     const ws = xlsx.utils.json_to_sheet(SAMPLE_EMPLOYEES);
@@ -150,16 +163,15 @@ router.get('/template/csv', (req, res) => {
   }
 });
 
-// POST /api/upload - Upload and process employee dataset
+// POST /api/upload
 router.post('/', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
 
-    const mode = req.body.mode || 'append'; // 'append' or 'overwrite'
+    const mode = req.body.mode || 'append';
 
-    // Parse workbook
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer', cellDates: true });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
@@ -169,7 +181,6 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Uploaded file is empty or contains no records.' });
     }
 
-    // Header validation
     const firstRow = rawRows[0];
     const presentNormalizedKeys = Object.keys(firstRow).map(normalizeKey);
     const missingHeaders = REQUIRED_HEADERS.filter(reqKey => !presentNormalizedKeys.includes(reqKey));
@@ -185,13 +196,11 @@ router.post('/', upload.single('file'), async (req, res) => {
       });
     }
 
-    // Process and validate rows
     const validRecords = [];
     const errors = [];
 
     rawRows.forEach((row, index) => {
-      const rowNum = index + 2; // Accounting for 1-based index and header row
-      // Build a lookup by normalized key
+      const rowNum = index + 2;
       const keyMap = {};
       for (const [k, v] of Object.entries(row)) {
         keyMap[normalizeKey(k)] = v;
@@ -221,13 +230,18 @@ router.post('/', upload.single('file'), async (req, res) => {
         return;
       }
 
-      // Optional fields
+      // Academic ML and operational fields
+      const workingHours = keyMap['workinghours'] !== undefined && !isNaN(parseFloat(keyMap['workinghours'])) ? parseFloat(keyMap['workinghours']) : 40.0;
+      const trainingHours = keyMap['traininghours'] !== undefined && !isNaN(parseFloat(keyMap['traininghours'])) ? parseFloat(keyMap['traininghours']) : 20.0;
+      const jobSatisfaction = keyMap['jobsatisfaction'] !== undefined && !isNaN(parseFloat(keyMap['jobsatisfaction'])) ? parseFloat(keyMap['jobsatisfaction']) : 3.8;
+      const workload = keyMap['workload'] !== undefined && !isNaN(parseFloat(keyMap['workload'])) ? parseFloat(keyMap['workload']) : 3.2;
+      const previousPerformanceRating = keyMap['previousperformancerating'] !== undefined && !isNaN(parseFloat(keyMap['previousperformancerating'])) ? parseFloat(keyMap['previousperformancerating']) : 3.5;
+
       const quality = keyMap['qualityscore'] !== undefined && !isNaN(parseFloat(keyMap['qualityscore'])) ? parseFloat(keyMap['qualityscore']) : 80;
       const targetRate = keyMap['targetcompletionrate'] !== undefined && !isNaN(parseFloat(keyMap['targetcompletionrate'])) ? parseFloat(keyMap['targetcompletionrate']) : 85;
       const projects = keyMap['projectscompleted'] !== undefined && !isNaN(parseInt(keyMap['projectscompleted'])) ? parseInt(keyMap['projectscompleted']) : 0;
       const tasks = keyMap['taskscompleted'] !== undefined && !isNaN(parseInt(keyMap['taskscompleted'])) ? parseInt(keyMap['taskscompleted']) : 0;
       const salary = keyMap['salary'] !== undefined && !isNaN(parseFloat(keyMap['salary'])) ? parseFloat(keyMap['salary']) : 0;
-      const training = keyMap['traininghours'] !== undefined && !isNaN(parseFloat(keyMap['traininghours'])) ? parseFloat(keyMap['traininghours']) : 0;
       const manager = keyMap['managername']?.toString().trim() || 'Unassigned';
       const email = keyMap['email']?.toString().trim() || `${empId.toLowerCase()}@workforce.io`;
       const phone = keyMap['phone']?.toString().trim() || '';
@@ -253,6 +267,11 @@ router.post('/', upload.single('file'), async (req, res) => {
         attendancePercentage: att,
         performanceScore: perf,
         productivityScore: prod,
+        workingHours,
+        trainingHours,
+        jobSatisfaction,
+        workload,
+        previousPerformanceRating,
         qualityScore: quality,
         targetCompletionRate: targetRate,
         projectsCompleted: projects,
@@ -261,7 +280,6 @@ router.post('/', upload.single('file'), async (req, res) => {
         joiningDate,
         managerName: manager,
         skills: skillsArray,
-        trainingHours: training,
         email,
         phone,
         status: 'Active'
@@ -283,7 +301,6 @@ router.post('/', upload.single('file'), async (req, res) => {
       });
     }
 
-    // Execute database operations based on mode
     let insertedCount = 0;
     let updatedCount = 0;
 
@@ -292,7 +309,6 @@ router.post('/', upload.single('file'), async (req, res) => {
       await Employee.insertMany(validRecords);
       insertedCount = validRecords.length;
     } else {
-      // Upsert records
       for (const rec of validRecords) {
         const resOp = await Employee.findOneAndUpdate(
           { userId: req.userId, employeeId: rec.employeeId },

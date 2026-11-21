@@ -13,6 +13,7 @@ import DepartmentAnalytics from './pages/DepartmentAnalytics';
 import PerformanceRisks from './pages/PerformanceRisks';
 import UploadDataset from './pages/UploadDataset';
 import Reports from './pages/Reports';
+import DataMiningML from './pages/DataMiningML';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -56,6 +57,7 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/employees" element={<EmployeeAnalytics />} />
         <Route path="/employees/:employeeId" element={<EmployeeDetails />} />
+        <Route path="/ml-analytics" element={<DataMiningML />} />
         <Route path="/departments" element={<DepartmentAnalytics />} />
         <Route path="/performance-risks" element={<PerformanceRisks />} />
         <Route path="/upload" element={<UploadDataset />} />

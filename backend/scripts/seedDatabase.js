@@ -72,147 +72,175 @@ function randRange(min, max, decimals = 0) {
   return decimals === 0 ? Math.round(val) : parseFloat(val.toFixed(decimals));
 }
 
-export function generateRealisticEmployees(userId, count = 60) {
-  const employees = [];
-  let empNum = 101;
+  export function generateRealisticEmployees(userId, count = 75) {
+    const employees = [];
+    let empNum = 101;
 
-  for (let i = 0; i < count; i++) {
-    const deptInfo = sample(DEPARTMENTS);
-    const firstName = sample(FIRST_NAMES);
-    const lastName = sample(LAST_NAMES);
-    const fullName = `${firstName} ${lastName}`;
-    const designation = sample(deptInfo.designations);
-    const skillsList = SKILL_POOLS[deptInfo.name] || ['Communication', 'Project Management'];
-    const empSkills = [sample(skillsList), sample(skillsList), sample(skillsList)].filter((v, idx, a) => a.indexOf(v) === idx);
+    for (let i = 0; i < count; i++) {
+      const deptInfo = sample(DEPARTMENTS);
+      const firstName = sample(FIRST_NAMES);
+      const lastName = sample(LAST_NAMES);
+      const fullName = `${firstName} ${lastName}`;
+      const designation = sample(deptInfo.designations);
+      const skillsList = SKILL_POOLS[deptInfo.name] || ['Communication', 'Project Management'];
+      const empSkills = [sample(skillsList), sample(skillsList), sample(skillsList)].filter((v, idx, a) => a.indexOf(v) === idx);
 
-    // Profile distribution:
-    // ~15% high performers, ~15% struggling/at risk, ~70% solid average
-    const profileType = i % 7 === 0 ? 'high' : (i % 7 === 1 ? 'struggling' : 'normal');
+      // Profile distribution for balanced multi-class ML dataset:
+      // ~25% High Performers, ~25% Low/Struggling, ~50% Medium/Average
+      const profileType = i % 4 === 0 ? 'high' : (i % 4 === 1 ? 'struggling' : 'medium');
 
-    let perf, prod, att, quality, targetRate, exp, projects, tasks;
+      let perf, prod, att, quality, targetRate, exp, projects, tasks, workingHours, trainingHours, jobSatisfaction, workload, prevRating;
 
-    if (profileType === 'high') {
-      perf = randRange(85, 98, 1);
-      prod = randRange(88, 99, 1);
-      att = randRange(92, 100, 1);
-      quality = randRange(88, 98, 1);
-      targetRate = randRange(90, 100, 1);
-      exp = randRange(3.5, 12, 1);
-      projects = randRange(6, 18);
-      tasks = randRange(40, 95);
-    } else if (profileType === 'struggling') {
-      perf = randRange(42, 59, 1);
-      prod = randRange(45, 62, 1);
-      att = randRange(62, 74, 1);
-      quality = randRange(55, 68, 1);
-      targetRate = randRange(50, 68, 1);
-      exp = randRange(0.8, 4.5, 1);
-      projects = randRange(1, 4);
-      tasks = randRange(12, 28);
+      if (profileType === 'high') {
+        perf = randRange(82, 98, 1);
+        prod = randRange(85, 99, 1);
+        att = randRange(92, 100, 1);
+        quality = randRange(88, 98, 1);
+        targetRate = randRange(90, 100, 1);
+        exp = randRange(3.5, 12, 1);
+        projects = randRange(6, 18);
+        tasks = randRange(45, 95);
+        workingHours = randRange(42, 52, 1);
+        trainingHours = randRange(25, 60, 1);
+        jobSatisfaction = randRange(4.0, 5.0, 1);
+        workload = randRange(3.0, 4.2, 1);
+        prevRating = randRange(4.2, 5.0, 1);
+      } else if (profileType === 'struggling') {
+        perf = randRange(42, 63, 1);
+        prod = randRange(45, 64, 1);
+        att = randRange(62, 74, 1);
+        quality = randRange(55, 68, 1);
+        targetRate = randRange(50, 68, 1);
+        exp = randRange(0.8, 4.0, 1);
+        projects = randRange(1, 4);
+        tasks = randRange(12, 28);
+        workingHours = randRange(32, 40, 1);
+        trainingHours = randRange(4, 16, 1);
+        jobSatisfaction = randRange(1.8, 3.1, 1);
+        workload = randRange(1.5, 2.8, 1);
+        prevRating = randRange(1.8, 2.9, 1);
+      } else {
+        perf = randRange(66, 79, 1);
+        prod = randRange(68, 81, 1);
+        att = randRange(80, 94, 1);
+        quality = randRange(72, 85, 1);
+        targetRate = randRange(72, 88, 1);
+        exp = randRange(1.5, 8.5, 1);
+        projects = randRange(3, 10);
+        tasks = randRange(26, 58);
+        workingHours = randRange(38, 45, 1);
+        trainingHours = randRange(15, 35, 1);
+        jobSatisfaction = randRange(3.2, 4.1, 1);
+        workload = randRange(2.8, 3.8, 1);
+        prevRating = randRange(3.2, 4.1, 1);
+      }
+
+      const salaryBase = 55000 + (exp * 8500) + (perf * 350);
+      const salary = Math.round(salaryBase / 1000) * 1000;
+
+      const empId = `EMP${empNum++}`;
+      const joiningDate = new Date();
+      joiningDate.setFullYear(joiningDate.getFullYear() - Math.floor(exp));
+      joiningDate.setMonth(randRange(0, 11));
+
+      const rec = {
+        userId,
+        employeeId: empId,
+        employeeName: fullName,
+        department: deptInfo.name,
+        designation,
+        experience: exp,
+        attendancePercentage: att,
+        performanceScore: perf,
+        productivityScore: prod,
+        workingHours,
+        trainingHours,
+        jobSatisfaction,
+        workload,
+        previousPerformanceRating: prevRating,
+        qualityScore: quality,
+        targetCompletionRate: targetRate,
+        projectsCompleted: projects,
+        tasksCompleted: tasks,
+        salary,
+        joiningDate,
+        managerName: deptInfo.manager,
+        skills: empSkills,
+        email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@workforce.io`,
+        phone: `+1 (555) ${randRange(200, 899)}-${randRange(1000, 9999)}`,
+        status: profileType === 'struggling' && att < 68 ? 'Under Review' : 'Active'
+      };
+
+      const metrics = calculateEmployeeMetrics(rec);
+      rec.epi = metrics.epi;
+      rec.performanceCategory = metrics.performanceCategory;
+      rec.riskLevel = metrics.riskLevel;
+
+      if (rec.riskLevel === 'Critical') {
+        rec.interventions = [{
+          actionType: 'PIP',
+          note: '30-day Performance Improvement Plan scheduled due to declining attendance and low KPI achievement.',
+          assignedBy: deptInfo.manager,
+          actionDate: new Date()
+        }];
+      }
+
+      employees.push(rec);
+    }
+
+    return employees;
+  }
+
+  export async function seedInitialAdminAndData() {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    let user = await User.findOne({ email: adminEmail });
+
+    if (!user) {
+      user = new User({
+        email: adminEmail,
+        name: 'Alex Morgan',
+        password: adminPassword,
+        organization: 'Nexus Global Enterprises',
+        role: 'HR Administrator'
+      });
+      await user.save();
+      console.log(`[Seed] Created default HR Administrator: ${adminEmail} (password: Admin@123)`);
+    }
+
+    const existingEmployees = await Employee.countDocuments({ userId: user._id });
+    if (existingEmployees === 0) {
+      const dummyData = generateRealisticEmployees(user._id, 75);
+      await Employee.insertMany(dummyData);
+      console.log(`[Seed] Successfully seeded ${dummyData.length} realistic employee profiles for ${adminEmail}`);
     } else {
-      perf = randRange(68, 84, 1);
-      prod = randRange(70, 86, 1);
-      att = randRange(82, 96, 1);
-      quality = randRange(75, 88, 1);
-      targetRate = randRange(75, 92, 1);
-      exp = randRange(1.5, 8.5, 1);
-      projects = randRange(3, 11);
-      tasks = randRange(25, 60);
+      // If fewer than 40 records, refresh with new attributes
+      const firstEmp = await Employee.findOne({ userId: user._id });
+      if (!firstEmp || firstEmp.workingHours === undefined) {
+        await Employee.deleteMany({ userId: user._id });
+        const dummyData = generateRealisticEmployees(user._id, 75);
+        await Employee.insertMany(dummyData);
+        console.log(`[Seed] Updated ${dummyData.length} employee records with extended academic ML attributes.`);
+      } else {
+        console.log(`[Seed] Found ${existingEmployees} existing employee records with academic ML attributes.`);
+      }
     }
 
-    const salaryBase = 55000 + (exp * 8500) + (perf * 350);
-    const salary = Math.round(salaryBase / 1000) * 1000;
-
-    const empId = `EMP${empNum++}`;
-    const joiningDate = new Date();
-    joiningDate.setFullYear(joiningDate.getFullYear() - Math.floor(exp));
-    joiningDate.setMonth(randRange(0, 11));
-
-    const rec = {
-      userId,
-      employeeId: empId,
-      employeeName: fullName,
-      department: deptInfo.name,
-      designation,
-      experience: exp,
-      attendancePercentage: att,
-      performanceScore: perf,
-      productivityScore: prod,
-      qualityScore: quality,
-      targetCompletionRate: targetRate,
-      projectsCompleted: projects,
-      tasksCompleted: tasks,
-      salary,
-      joiningDate,
-      managerName: deptInfo.manager,
-      skills: empSkills,
-      trainingHours: randRange(8, 48, 1),
-      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@workforce.io`,
-      phone: `+1 (555) ${randRange(200, 899)}-${randRange(1000, 9999)}`,
-      status: profileType === 'struggling' && att < 68 ? 'Under Review' : 'Active'
-    };
-
-    const metrics = calculateEmployeeMetrics(rec);
-    rec.epi = metrics.epi;
-    rec.performanceCategory = metrics.performanceCategory;
-    rec.riskLevel = metrics.riskLevel;
-
-    if (rec.riskLevel === 'Critical') {
-      rec.interventions = [{
-        actionType: 'PIP',
-        note: '30-day Performance Improvement Plan scheduled due to declining attendance and low KPI achievement.',
-        assignedBy: deptInfo.manager,
-        actionDate: new Date()
-      }];
-    }
-
-    employees.push(rec);
+    return user;
   }
 
-  return employees;
-}
-
-export async function seedInitialAdminAndData() {
-  const adminEmail = 'admin@workforce.io';
-  let user = await User.findOne({ email: adminEmail });
-
-  if (!user) {
-    user = new User({
-      email: adminEmail,
-      name: 'Alex Morgan',
-      password: 'Admin@123',
-      organization: 'Nexus Global Enterprises',
-      role: 'HR Administrator'
-    });
-    await user.save();
-    console.log(`[Seed] Created default HR Administrator: ${adminEmail} (password: Admin@123)`);
+  if (process.argv[1]?.endsWith('seedDatabase.js')) {
+    (async () => {
+      try {
+        const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/employee-dashboard';
+        await mongoose.connect(uri);
+        console.log('MongoDB connected for seeding script.');
+        await seedInitialAdminAndData();
+        console.log('Seed completed successfully.');
+        process.exit(0);
+      } catch (err) {
+        console.error('Seed script error:', err);
+        process.exit(1);
+      }
+    })();
   }
-
-  const existingEmployees = await Employee.countDocuments({ userId: user._id });
-  if (existingEmployees === 0) {
-    const dummyData = generateRealisticEmployees(user._id, 60);
-    await Employee.insertMany(dummyData);
-    console.log(`[Seed] Successfully seeded ${dummyData.length} realistic employee profiles for ${adminEmail}`);
-  } else {
-    console.log(`[Seed] Found ${existingEmployees} existing employee records. Keeping current dataset.`);
-  }
-
-  return user;
-}
-
-// Standalone execution if run directly via `node seedDatabase.js`
-if (process.argv[1]?.endsWith('seedDatabase.js')) {
-  (async () => {
-    try {
-      const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/employee-dashboard';
-      await mongoose.connect(uri);
-      console.log('MongoDB connected for seeding script.');
-      await seedInitialAdminAndData();
-      console.log('Seed completed successfully.');
-      process.exit(0);
-    } catch (err) {
-      console.error('Seed script error:', err);
-      process.exit(1);
-    }
-  })();
-}

@@ -11,6 +11,11 @@ class EmployeeData(BaseModel):
     attendancePercentage: float
     performanceScore: float
     productivityScore: float
+    workingHours: float = 40.0
+    trainingHours: float = 20.0
+    jobSatisfaction: float = 3.8
+    workload: float = 3.2
+    previousPerformanceRating: float = 3.5
     qualityScore: float = 80.0
     targetCompletionRate: float = 85.0
     projectsCompleted: int = 0
@@ -19,7 +24,6 @@ class EmployeeData(BaseModel):
     joiningDate: Optional[str] = None
     managerName: Optional[str] = "Unassigned"
     skills: Optional[List[str]] = []
-    trainingHours: float = 0.0
     email: Optional[str] = None
     phone: Optional[str] = None
     status: Optional[str] = "Active"
@@ -66,17 +70,15 @@ class DepartmentMetric(BaseModel):
     manager: Optional[str] = "Various"
 
 class InsightItem(BaseModel):
-    """Structured insight item"""
     id: str
-    type: str  # 'correlation', 'top_department', 'risk_alert', 'productivity_drop', 'opportunity'
+    type: str
     title: str
     description: str
-    severity: str  # 'info', 'success', 'warning', 'danger'
+    severity: str
     metricValue: Optional[float] = None
     metadata: Optional[Dict[str, Any]] = None
 
 class StatisticalInsightsResponse(BaseModel):
-    """Comprehensive statistical insights"""
     correlationAttendancePerformance: float
     correlationProductivityPerformance: float
     attendancePValue: float
@@ -108,8 +110,8 @@ class PredictionResponse(BaseModel):
     actualPerformance: float
     predictedPerformance: float
     performanceDelta: float
-    trend: str  # 'Positive', 'Negative', 'Aligned'
-    confidenceScore: float  # R2 or model confidence
+    trend: str
+    confidenceScore: float
     featureImportances: Dict[str, float]
     expectedEPI: float
     keyDrivers: List[str]
@@ -127,8 +129,8 @@ class RiskAssessmentItem(BaseModel):
     targetCompletionRate: float
     qualityScore: float
     epi: float
-    riskScore: float  # 0-100
-    priority: str  # 'Critical', 'High', 'Medium', 'Low'
+    riskScore: float
+    priority: str
     riskFactors: List[str]
     suggestedInterventions: List[str]
     contactEmail: Optional[str]
@@ -147,10 +149,78 @@ class EmployeeDeepDiveResponse(BaseModel):
     calculatedEPI: float
     category: str
     riskPriority: str
-    radarScores: Dict[str, float]  # Productivity, Quality, Attendance, TargetAchievement, TaskCompletion
+    radarScores: Dict[str, float]
     departmentPercentile: float
     workforcePercentile: float
     strengths: List[str]
     weaknesses: List[str]
     actionableRecommendations: List[str]
     peerComparison: Dict[str, Any]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Academic Data Mining & Machine Learning Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PreprocessingReport(BaseModel):
+    totalRawRecords: int
+    finalProcessedRecords: int
+    missingValuesHandled: int
+    duplicateRecordsRemoved: int
+    encodedCategoricalFeatures: List[str]
+    scaledNumericalFeatures: List[str]
+    targetClasses: List[str]
+    classDistribution: Dict[str, int]
+
+class ModelEvaluationMetrics(BaseModel):
+    modelName: str
+    accuracy: float
+    precisionMacro: float
+    recallMacro: float
+    f1Macro: float
+    precisionWeighted: float
+    recallWeighted: float
+    f1Weighted: float
+    confusionMatrix: List[List[int]]
+    classNames: List[str]
+    trainingSamples: int
+    testingSamples: int
+    hyperparameters: Dict[str, Any]
+
+class MLModelComparisonResponse(BaseModel):
+    preprocessingReport: PreprocessingReport
+    decisionTree: ModelEvaluationMetrics
+    randomForest: ModelEvaluationMetrics
+    logisticRegression: ModelEvaluationMetrics
+    bestModel: str
+    bestModelReason: str
+    featureImportances: Dict[str, float]
+    comparisonSummary: List[Dict[str, Any]]
+
+class MLPredictionRequest(BaseModel):
+    experience: float
+    attendancePercentage: float
+    workingHours: float
+    trainingHours: float
+    jobSatisfaction: float
+    workload: float
+    department: str
+    previousPerformanceRating: float
+    productivityScore: float
+    modelChoice: Optional[str] = "Random Forest"
+    employeesContext: Optional[List[EmployeeData]] = []
+
+class MLPredictionResult(BaseModel):
+    predictedCategory: str  # "Low", "Medium", "High"
+    confidence: float
+    classProbabilities: Dict[str, float]
+    modelUsed: str
+    featureDrivers: List[str]
+    recommendations: List[str]
+
+class EDAVisualizationsResponse(BaseModel):
+    performanceLevelDistribution: List[Dict[str, Any]]
+    attendanceVsPerformance: List[Dict[str, Any]]
+    trainingHoursVsPerformance: List[Dict[str, Any]]
+    experienceVsPerformance: List[Dict[str, Any]]
+    jobSatisfactionVsPerformance: List[Dict[str, Any]]
+    departmentPerformanceComparison: List[Dict[str, Any]]

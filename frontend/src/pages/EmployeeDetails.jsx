@@ -20,7 +20,10 @@ import {
   FileText,
   UserCheck,
   Zap,
-  BarChart2
+  BarChart2,
+  Smile,
+  Activity,
+  History
 } from 'lucide-react';
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -144,7 +147,6 @@ export default function EmployeeDetails() {
     );
   }
 
-  // Radar chart data preparation
   const radarData = deepDive?.radarScores ? [
     { subject: 'Productivity', score: deepDive.radarScores.Productivity, fullMark: 100 },
     { subject: 'Quality', score: deepDive.radarScores.Quality, fullMark: 100 },
@@ -306,6 +308,44 @@ export default function EmployeeDetails() {
         </div>
       </div>
 
+      {/* ─── Academic ML Input Attributes Grid ───────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-indigo-600" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              Data Mining & Machine Learning Operational Attributes
+            </h3>
+          </div>
+          <Link to="/ml-analytics" className="text-xs font-bold text-indigo-600 hover:underline">
+            View in ML Engine &rarr;
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Weekly Working Hours</span>
+            <span className="text-base font-bold text-slate-900 dark:text-white">{employee.workingHours || 40} hrs/wk</span>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Training Hours (L&D)</span>
+            <span className="text-base font-bold text-slate-900 dark:text-white">{employee.trainingHours || 20} hrs</span>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Job Satisfaction</span>
+            <span className="text-base font-bold text-amber-500">{employee.jobSatisfaction || 3.8} / 5.0</span>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Workload Level</span>
+            <span className="text-base font-bold text-slate-900 dark:text-white">{employee.workload || 3.2} / 5.0</span>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Previous Rating</span>
+            <span className="text-base font-bold text-indigo-600 dark:text-indigo-400">{employee.previousPerformanceRating || 3.5} / 5.0</span>
+          </div>
+        </div>
+      </div>
+
       {/* ─── Machine Learning Performance Forecast Card ──────────────────── */}
       {prediction && (
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 border border-indigo-900/60 shadow-lg space-y-4">
@@ -366,7 +406,6 @@ export default function EmployeeDetails() {
 
       {/* ─── Visualizations: Radar & Metric Breakdown ────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Performance Radar Chart */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -389,7 +428,6 @@ export default function EmployeeDetails() {
           </div>
         </div>
 
-        {/* Operational Metrics Bar Breakdown */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -419,7 +457,6 @@ export default function EmployeeDetails() {
 
       {/* ─── Dynamic Strengths, Weaknesses & Recommendations ──────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Strengths */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-emerald-200 dark:border-emerald-900/40 p-5 shadow-xs space-y-3">
           <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 size={18} />
@@ -435,7 +472,6 @@ export default function EmployeeDetails() {
           </ul>
         </div>
 
-        {/* Weaknesses / Opportunities */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-amber-200 dark:border-amber-900/40 p-5 shadow-xs space-y-3">
           <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
             <AlertTriangle size={18} />
@@ -451,7 +487,6 @@ export default function EmployeeDetails() {
           </ul>
         </div>
 
-        {/* Actionable Recommendations */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-indigo-200 dark:border-indigo-900/40 p-5 shadow-xs space-y-3">
           <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
             <Lightbulb size={18} />
@@ -637,26 +672,49 @@ export default function EmployeeDetails() {
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold mb-1">Attendance Rate (%)</label>
+                    <label className="block font-semibold mb-1">Weekly Working Hours</label>
                     <input
                       type="number"
-                      step="0.5"
-                      min="0"
-                      max="100"
-                      value={editForm.attendancePercentage}
-                      onChange={(e) => setEditForm({ ...editForm, attendancePercentage: parseFloat(e.target.value) })}
+                      step="1"
+                      min="10"
+                      max="80"
+                      value={editForm.workingHours || 40}
+                      onChange={(e) => setEditForm({ ...editForm, workingHours: parseFloat(e.target.value) })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold mb-1">Quality Score (%)</label>
+                    <label className="block font-semibold mb-1">Training Hours</label>
                     <input
                       type="number"
-                      step="0.5"
+                      step="1"
                       min="0"
-                      max="100"
-                      value={editForm.qualityScore || 80}
-                      onChange={(e) => setEditForm({ ...editForm, qualityScore: parseFloat(e.target.value) })}
+                      value={editForm.trainingHours || 20}
+                      onChange={(e) => setEditForm({ ...editForm, trainingHours: parseFloat(e.target.value) })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">Job Satisfaction (1-5)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max="5"
+                      value={editForm.jobSatisfaction || 3.8}
+                      onChange={(e) => setEditForm({ ...editForm, jobSatisfaction: parseFloat(e.target.value) })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">Workload (1-5)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max="5"
+                      value={editForm.workload || 3.2}
+                      onChange={(e) => setEditForm({ ...editForm, workload: parseFloat(e.target.value) })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
                     />
                   </div>

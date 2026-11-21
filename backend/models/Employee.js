@@ -70,7 +70,37 @@ const employeeSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
-  // Optional Fields
+  // Academic Data Mining & HR Attributes
+  workingHours: {
+    type: Number,
+    default: 40,
+    min: 10,
+    max: 80
+  },
+  trainingHours: {
+    type: Number,
+    default: 20,
+    min: 0
+  },
+  jobSatisfaction: {
+    type: Number,
+    default: 3.8,
+    min: 1,
+    max: 5
+  },
+  workload: {
+    type: Number,
+    default: 3.2,
+    min: 1,
+    max: 5
+  },
+  previousPerformanceRating: {
+    type: Number,
+    default: 3.5,
+    min: 1,
+    max: 5
+  },
+  // Additional Optional Fields
   qualityScore: {
     type: Number,
     default: 80,
@@ -111,11 +141,6 @@ const employeeSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
-  trainingHours: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
   email: {
     type: String,
     trim: true
@@ -135,8 +160,8 @@ const employeeSchema = new mongoose.Schema({
   },
   performanceCategory: {
     type: String,
-    enum: ['Critical', 'Needs Improvement', 'Average', 'Good', 'Excellent'],
-    default: 'Average'
+    enum: ['Critical', 'Needs Improvement', 'Average', 'Good', 'Excellent', 'Low', 'Medium', 'High'],
+    default: 'Medium'
   },
   riskLevel: {
     type: String,
@@ -154,7 +179,7 @@ employeeSchema.index({ userId: 1, department: 1, designation: 1 });
 employeeSchema.index({ userId: 1, riskLevel: 1 });
 employeeSchema.index({ userId: 1, performanceCategory: 1 });
 
-// Helper to compute EPI, category, and risk level
+// Helper to compute EPI, 3-tier ML class & 5-tier category, and risk level
 export function calculateEmployeeMetrics(emp) {
   const prod = Number(emp.productivityScore) || 0;
   const quality = Number(emp.qualityScore) || 80;
@@ -173,6 +198,7 @@ export function calculateEmployeeMetrics(emp) {
     (0.10 * taskScore)
   ).toFixed(2));
 
+  // 5-Tier Executive Category
   let category = 'Average';
   if (epi >= 85) category = 'Excellent';
   else if (epi >= 75) category = 'Good';
@@ -180,7 +206,14 @@ export function calculateEmployeeMetrics(emp) {
   else if (epi >= 50) category = 'Needs Improvement';
   else category = 'Critical';
 
+  // 3-Tier Academic Machine Learning Classification Target:
+  // Low (< 65), Medium (65 - 79.9), High (>= 80)
   const perf = Number(emp.performanceScore) || 0;
+  let mlCategory = 'Medium';
+  if (perf < 65) mlCategory = 'Low';
+  else if (perf >= 80) mlCategory = 'High';
+  else mlCategory = 'Medium';
+
   let risk = 'Low';
   if (epi < 50 || (perf < 50 && att < 70)) {
     risk = 'Critical';
@@ -192,10 +225,9 @@ export function calculateEmployeeMetrics(emp) {
     risk = 'Low';
   }
 
-  return { epi, performanceCategory: category, riskLevel: risk };
+  return { epi, performanceCategory: category, mlCategory, riskLevel: risk };
 }
 
-// Pre-save hook to ensure calculated fields are synced
 employeeSchema.pre('save', function (next) {
   const metrics = calculateEmployeeMetrics(this);
   this.epi = metrics.epi;

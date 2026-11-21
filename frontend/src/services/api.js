@@ -50,7 +50,6 @@ export const employeeAPI = {
     api.post(`/employees/${employeeId}/interventions`, interventionData),
 };
 
-// Compatibility alias
 export const studentAPI = employeeAPI;
 
 // ─── Upload API ──────────────────────────────────────────────────────────────
@@ -79,11 +78,15 @@ export const analyticsAPI = {
   getDeepDive: (employeeId) => api.get(`/analytics/deep-dive/${employeeId}`),
   getRisks: (params) => api.get('/analytics/risks', { params }),
   getHealth: () => api.get('/analytics/analytics-health'),
+
+  // Academic Data Mining & Machine Learning
+  getMLModels: () => api.get('/analytics/ml/models'),
+  getEDAPlots: () => api.get('/analytics/ml/visualizations'),
+  predictML: (payload) => api.post('/analytics/ml/predict', payload),
 };
 
 // ─── Export API ──────────────────────────────────────────────────────────────
 export const exportAPI = {
-  // Excel
   exportFullDatabaseExcel: () =>
     api.get('/export/excel/full-database', { responseType: 'blob' }),
   exportPerformanceSummaryExcel: () =>
@@ -95,7 +98,6 @@ export const exportAPI = {
   exportHighPerformersExcel: () =>
     api.get('/export/excel/high-performers', { responseType: 'blob' }),
 
-  // PDF
   exportExecutiveWorkforcePDF: () =>
     api.get('/export/pdf/executive-workforce', { responseType: 'blob' }),
   exportEmployeeAppraisalPDF: (employeeId) =>
