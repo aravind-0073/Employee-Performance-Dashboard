@@ -183,6 +183,8 @@ router.get('/distributions', async (req, res) => {
       analyticsAPI.distributions(employees),
       () => {
         const total = employees.length;
+
+        // 1. Performance distribution histogram
         const perfBuckets = [
           { name: 'Poor (<50)', count: employees.filter(e => e.performanceScore < 50).length, color: '#ef4444' },
           { name: 'Needs Imp. (50-64)', count: employees.filter(e => e.performanceScore >= 50 && e.performanceScore < 65).length, color: '#f97316' },
@@ -191,15 +193,82 @@ router.get('/distributions', async (req, res) => {
           { name: 'Excellent (85-100)', count: employees.filter(e => e.performanceScore >= 85).length, color: '#10b981' }
         ].map(b => ({ ...b, percentage: Number(((b.count / total) * 100).toFixed(1)) }));
 
-        const sorted = [...employees].sort((a, b) => b.performanceScore - a.performanceScore);
+        // 2. Attendance distribution (<75% critical deficit detection)
+        const attBuckets = [
+          { name: '< 75% (Critical)', count: employees.filter(e => e.attendancePercentage < 75).length, color: '#ef4444' },
+          { name: '75% - 84% (Warning)', count: employees.filter(e => e.attendancePercentage >= 75 && e.attendancePercentage < 85).length, color: '#f59e0b' },
+          { name: '85% - 94% (Good)', count: employees.filter(e => e.attendancePercentage >= 85 && e.attendancePercentage < 95).length, color: '#3b82f6' },
+          { name: '95% - 100% (Optimal)', count: employees.filter(e => e.attendancePercentage >= 95).length, color: '#10b981' }
+        ].map(b => ({ ...b, percentage: Number(((b.count / total) * 100).toFixed(1)) }));
+
+        // 3. Category ratios (EPI Efficiency Tiers)
+        const categories = ['Excellent', 'Good', 'Average', 'Needs Improvement', 'Critical'];
+        const catColors = { 'Excellent': '#10b981', 'Good': '#3b82f6', 'Average': '#eab308', 'Needs Improvement': '#f97316', 'Critical': '#ef4444' };
+        const categoryRatios = categories.map(cat => {
+          const count = employees.filter(e => (e.performanceCategory || 'Average') === cat).length;
+          return {
+            name: cat,
+            count,
+            percentage: Number(((count / total) * 100).toFixed(1)),
+            color: catColors[cat]
+          };
+        }).filter(c => c.count > 0);
+
+        // 4. Department comparisons (Multi-metric bar chart)
+        const deptGroups = {};
+        for (const e of employees) {
+          if (!deptGroups[e.department]) deptGroups[e.department] = [];
+          deptGroups[e.department].push(e);
+        }
+        const departmentComparisons = Object.entries(deptGroups).map(([dept, list]) => {
+          const n = list.length;
+          return {
+            department: dept,
+            headcount: n,
+            avgPerformance: Number((list.reduce((a, b) => a + (b.performanceScore || 0), 0) / n).toFixed(1)),
+            avgProductivity: Number((list.reduce((a, b) => a + (b.productivityScore || 0), 0) / n).toFixed(1)),
+            avgAttendance: Number((list.reduce((a, b) => a + (b.attendancePercentage || 0), 0) / n).toFixed(1)),
+            highPerformers: list.filter(e => e.performanceScore >= 80).length,
+            underperformers: list.filter(e => e.performanceScore < 60).length
+          };
+        });
+
+        // 5. Productivity vs Target scatter items
+        const productivityVsTarget = employees.slice(0, 50).map(e => ({
+          employeeId: e.employeeId,
+          employeeName: e.employeeName,
+          department: e.department,
+          productivity: Number(e.productivityScore) || 75,
+          targetAchievement: Number(e.targetCompletionRate) || 85,
+          performance: Number(e.performanceScore) || 75,
+          category: e.performanceCategory || 'Average'
+        }));
+
+        // 6. Risk ratios
+        const risks = ['Low', 'Medium', 'High', 'Critical'];
+        const riskColors = { 'Low': '#10b981', 'Medium': '#3b82f6', 'High': '#f97316', 'Critical': '#ef4444' };
+        const riskRatios = risks.map(r => {
+          const count = employees.filter(e => (e.riskLevel || 'Low') === r).length;
+          return {
+            name: r,
+            count,
+            percentage: Number(((count / total) * 100).toFixed(1)),
+            color: riskColors[r]
+          };
+        });
+
+        // 7. Top & bottom leaderboards
+        const sorted = [...employees].sort((a, b) => (b.performanceScore || 0) - (a.performanceScore || 0));
 
         return {
           performanceDistribution: perfBuckets,
-          attendanceDistribution: [],
-          categoryRatios: [],
-          riskRatios: [],
-          departmentComparisons: [],
-          productivityVsTarget: [],
+          attendanceDistribution: attBuckets,
+          categoryRatios: categoryRatios.length > 0 ? categoryRatios : [
+            { name: 'Good', count: total, percentage: 100, color: '#3b82f6' }
+          ],
+          riskRatios,
+          departmentComparisons,
+          productivityVsTarget,
           top10Performers: sorted.slice(0, 10),
           bottom10Performers: sorted.slice(-10).reverse()
         };
@@ -554,14 +623,124 @@ router.get('/ml/visualizations', async (req, res) => {
 
     const data = await withPythonFallback(
       analyticsAPI.edaVisualizations(employees),
-      () => ({
-        performanceLevelDistribution: [],
-        attendanceVsPerformance: [],
-        trainingHoursVsPerformance: [],
-        experienceVsPerformance: [],
-        jobSatisfactionVsPerformance: [],
-        departmentPerformanceComparison: []
-      })
+      () => {
+        const total = employees.length;
+
+        // 1. Performance Level Distribution (Low < 65, Medium 65-79.9, High >= 80)
+        const lowList = employees.filter(e => (e.performanceScore || 0) < 65);
+        const medList = employees.filter(e => (e.performanceScore || 0) >= 65 && (e.performanceScore || 0) < 80);
+        const highList = employees.filter(e => (e.performanceScore || 0) >= 80);
+
+        const performanceLevelDistribution = [
+          {
+            level: 'Low Performance',
+            count: lowList.length,
+            percentage: Number(((lowList.length / total) * 100).toFixed(1)),
+            color: '#ef4444'
+          },
+          {
+            level: 'Medium Performance',
+            count: medList.length,
+            percentage: Number(((medList.length / total) * 100).toFixed(1)),
+            color: '#f59e0b'
+          },
+          {
+            level: 'High Performance',
+            count: highList.length,
+            percentage: Number(((highList.length / total) * 100).toFixed(1)),
+            color: '#10b981'
+          }
+        ];
+
+        // 2. Attendance vs Performance (Scatter points)
+        const attendanceVsPerformance = employees.slice(0, 60).map(e => {
+          const perf = Number(e.performanceScore) || 75;
+          const cat = perf < 65 ? 'Low Performance' : perf < 80 ? 'Medium Performance' : 'High Performance';
+          return {
+            employeeId: e.employeeId,
+            employeeName: e.employeeName,
+            attendance: Number(e.attendancePercentage) || 85,
+            performance: perf,
+            department: e.department,
+            category: cat
+          };
+        });
+
+        // 3. Training Hours vs Performance (Binned ranges)
+        const trainBins = [
+          { label: '< 15 hrs', filter: e => (e.trainingHours || 0) < 15 },
+          { label: '15 - 29 hrs', filter: e => (e.trainingHours || 0) >= 15 && (e.trainingHours || 0) < 30 },
+          { label: '30 - 44 hrs', filter: e => (e.trainingHours || 0) >= 30 && (e.trainingHours || 0) < 45 },
+          { label: '45+ hrs', filter: e => (e.trainingHours || 0) >= 45 }
+        ];
+        const trainingHoursVsPerformance = trainBins.map(b => {
+          const grp = employees.filter(b.filter);
+          const avgPerf = grp.length > 0
+            ? Number((grp.reduce((acc, e) => acc + (e.performanceScore || 0), 0) / grp.length).toFixed(1))
+            : 0;
+          return { range: b.label, avgPerformance: avgPerf, count: grp.length };
+        });
+
+        // 4. Experience vs Performance (Experience Bands)
+        const expBins = [
+          { label: '< 2 Yrs (Junior)', filter: e => (e.experience || 0) < 2 },
+          { label: '2 - 4 Yrs (Mid)', filter: e => (e.experience || 0) >= 2 && (e.experience || 0) < 5 },
+          { label: '5 - 8 Yrs (Senior)', filter: e => (e.experience || 0) >= 5 && (e.experience || 0) < 9 },
+          { label: '9+ Yrs (Lead/Principal)', filter: e => (e.experience || 0) >= 9 }
+        ];
+        const experienceVsPerformance = expBins.map(b => {
+          const grp = employees.filter(b.filter);
+          const avgPerf = grp.length > 0
+            ? Number((grp.reduce((acc, e) => acc + (e.performanceScore || 0), 0) / grp.length).toFixed(1))
+            : 0;
+          const avgProd = grp.length > 0
+            ? Number((grp.reduce((acc, e) => acc + (e.productivityScore || 0), 0) / grp.length).toFixed(1))
+            : 0;
+          return { experienceBand: b.label, avgPerformance: avgPerf, avgProductivity: avgProd, count: grp.length };
+        });
+
+        // 5. Job Satisfaction vs Performance (Ratings 1 to 5)
+        const jobSatisfactionVsPerformance = [1, 2, 3, 4, 5].map(rating => {
+          const grp = employees.filter(e => Math.round(e.jobSatisfaction || 3) === rating);
+          const avgPerf = grp.length > 0
+            ? Number((grp.reduce((acc, e) => acc + (e.performanceScore || 0), 0) / grp.length).toFixed(1))
+            : 0;
+          return {
+            satisfactionLevel: `Score ${rating}/5`,
+            rating,
+            avgPerformance: avgPerf,
+            headcount: grp.length
+          };
+        });
+
+        // 6. Department-wise Performance Comparison
+        const deptGroups = {};
+        for (const e of employees) {
+          if (!deptGroups[e.department]) deptGroups[e.department] = [];
+          deptGroups[e.department].push(e);
+        }
+        const departmentPerformanceComparison = Object.entries(deptGroups).map(([dept, grp]) => {
+          const n = grp.length;
+          return {
+            department: dept,
+            avgPerformance: Number((grp.reduce((a, b) => a + (b.performanceScore || 0), 0) / n).toFixed(1)),
+            avgProductivity: Number((grp.reduce((a, b) => a + (b.productivityScore || 0), 0) / n).toFixed(1)),
+            avgAttendance: Number((grp.reduce((a, b) => a + (b.attendancePercentage || 0), 0) / n).toFixed(1)),
+            highPerformers: grp.filter(e => (e.performanceScore || 0) >= 80).length,
+            lowPerformers: grp.filter(e => (e.performanceScore || 0) < 65).length,
+            total: n
+          };
+        });
+
+        return {
+          performanceLevelDistribution,
+          attendanceVsPerformance,
+          trainingHoursVsPerformance,
+          experienceVsPerformance,
+          jobSatisfactionVsPerformance,
+          departmentPerformanceComparison
+        };
+      }
     );
 
     res.json({ success: true, data });
